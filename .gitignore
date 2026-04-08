@@ -1,0 +1,19 @@
+# Configuration sensible — ne jamais committer
+config.php
+
+# Uploads utilisateur
+assets/uploads/
+
+# Cache fichiers
+cache/
+
+# Fichiers système
+.DS_Store
+Thumbs.db
+*.log
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
