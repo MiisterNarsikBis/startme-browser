@@ -383,6 +383,33 @@ function initBookmarksSortable() {
 }
 
 // ----------------------------------------------------------------
+// Thème clair / sombre
+// ----------------------------------------------------------------
+function applyTheme(theme) {
+  const html   = document.documentElement;
+  const btn    = document.getElementById('theme-toggle');
+  if (theme === 'light') {
+    html.classList.add('light');
+    html.classList.remove('dark');
+    if (btn) btn.textContent = '🌙';
+  } else {
+    html.classList.remove('light');
+    html.classList.add('dark');
+    if (btn) btn.textContent = '☀️';
+  }
+}
+
+function toggleTheme() {
+  const current = localStorage.getItem('theme') || 'dark';
+  const next    = current === 'dark' ? 'light' : 'dark';
+  localStorage.setItem('theme', next);
+  applyTheme(next);
+}
+
+// Appliquer immédiatement au chargement (avant initGrid)
+applyTheme(localStorage.getItem('theme') || 'dark');
+
+// ----------------------------------------------------------------
 // Auth
 // ----------------------------------------------------------------
 async function logout() {

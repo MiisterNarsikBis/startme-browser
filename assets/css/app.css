@@ -2,14 +2,71 @@
    app.css — Styles globaux Startme
    ============================================================ */
 
+/* -- Variables de thème ------------------------------------ */
+:root {
+  --widget-bg:      rgba(15,23,42,0.78);
+  --widget-border:  rgba(255,255,255,0.08);
+  --header-bg:      rgba(0,0,0,0.45);
+  --header-border:  rgba(255,255,255,0.08);
+  --overlay-bg:     rgba(0,0,0,0.30);
+  --text-1:         rgba(255,255,255,1);
+  --text-2:         rgba(255,255,255,0.80);
+  --text-3:         rgba(255,255,255,0.55);
+  --text-4:         rgba(255,255,255,0.30);
+  --hover-bg:       rgba(255,255,255,0.08);
+  --scrollbar-thumb: rgba(255,255,255,0.20);
+  --input-bg:       rgba(255,255,255,0.08);
+  --input-border:   rgba(255,255,255,0.15);
+  --input-text:     rgba(255,255,255,1);
+  --input-placeholder: rgba(255,255,255,0.30);
+  --rss-hover:      rgba(255,255,255,0.07);
+  --forecast-color: rgba(255,255,255,0.60);
+  --glass-bg:       rgba(9,12,25,0.93);
+  --glass-border:   rgba(255,255,255,0.10);
+}
+
+html.light {
+  --widget-bg:      rgba(255,255,255,0.88);
+  --widget-border:  rgba(0,0,0,0.10);
+  --header-bg:      rgba(248,250,252,0.90);
+  --header-border:  rgba(0,0,0,0.08);
+  --overlay-bg:     rgba(255,255,255,0.10);
+  --text-1:         rgba(15,23,42,1);
+  --text-2:         rgba(30,41,59,0.90);
+  --text-3:         rgba(71,85,105,0.80);
+  --text-4:         rgba(148,163,184,0.90);
+  --hover-bg:       rgba(0,0,0,0.05);
+  --scrollbar-thumb: rgba(0,0,0,0.15);
+  --input-bg:       rgba(0,0,0,0.04);
+  --input-border:   rgba(0,0,0,0.15);
+  --input-text:     rgba(15,23,42,1);
+  --input-placeholder: rgba(100,116,139,0.70);
+  --rss-hover:      rgba(0,0,0,0.05);
+  --forecast-color: rgba(30,41,59,0.70);
+  --glass-bg:       rgba(248,250,252,0.97);
+  --glass-border:   rgba(0,0,0,0.10);
+}
+
 /* -- Reset de base ----------------------------------------- */
 *, *::before, *::after { box-sizing: border-box; }
 
-/* -- Scrollbar dark ---------------------------------------- */
+/* -- Scrollbar -------------------------------------------- */
 ::-webkit-scrollbar { width: 5px; height: 5px; }
-::-webkit-scrollbar-track { background: rgba(255,255,255,0.05); }
-::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.2); border-radius: 9999px; }
-::-webkit-scrollbar-thumb:hover { background: rgba(255,255,255,0.35); }
+::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-thumb { background: var(--scrollbar-thumb); border-radius: 9999px; }
+::-webkit-scrollbar-thumb:hover { background: var(--scrollbar-thumb); opacity: .6; }
+
+/* -- Overlay body ------------------------------------------ */
+#body-overlay {
+  background: var(--overlay-bg);
+  transition: background 0.3s;
+}
+
+/* -- Header ------------------------------------------------ */
+#app-header {
+  background: var(--header-bg) !important;
+  border-bottom-color: var(--header-border) !important;
+}
 
 /* -- GridStack customisation ------------------------------- */
 .grid-stack {
@@ -17,7 +74,7 @@
 }
 
 .grid-stack-item-content {
-  inset: 4px !important; /* espace entre widgets */
+  inset: 4px !important;
 }
 
 /* Poignée de resize */
@@ -29,37 +86,51 @@
   cursor: se-resize;
 }
 
-/* -- Widget styles ----------------------------------------- */
+/* -- Widget ------------------------------------------------ */
 .widget {
-  transition: box-shadow 0.2s;
+  transition: box-shadow 0.2s, background 0.3s, border-color 0.3s;
+  background: var(--widget-bg) !important;
+  border-color: var(--widget-border) !important;
 }
 
 .widget:hover {
-  box-shadow: 0 0 0 1px rgba(99,102,241,0.3), 0 8px 32px rgba(0,0,0,0.4);
+  box-shadow: 0 0 0 1px rgba(99,102,241,0.3), 0 8px 32px rgba(0,0,0,0.2);
 }
 
-/* En mode admin : highlight au hover */
 .grid-stack-item.ui-draggable-dragging .widget {
-  box-shadow: 0 0 0 2px #6366f1, 0 16px 64px rgba(0,0,0,0.6);
+  box-shadow: 0 0 0 2px #6366f1, 0 16px 64px rgba(0,0,0,0.4);
   transform: scale(1.01);
 }
 
-/* -- Glass dark (modals) ----------------------------------- */
+/* Couleurs texte dans les widgets selon le thème */
+.widget .text-white   { color: var(--text-1) !important; }
+.widget .text-white\/80, .widget .text-white\/90 { color: var(--text-2) !important; }
+.widget .text-white\/60, .widget .text-white\/50, .widget .text-white\/40 { color: var(--text-3) !important; }
+.widget .text-white\/30, .widget .text-white\/20 { color: var(--text-4) !important; }
+
+/* Header des widgets */
+.widget-header {
+  cursor: grab;
+}
+.widget-header:active { cursor: grabbing; }
+.widget-header .text-white\/80 { color: var(--text-2) !important; }
+
+/* -- Glass (modals) --------------------------------------- */
 .glass-dark {
-  background: rgba(9, 12, 25, 0.93);
+  background: var(--glass-bg);
   backdrop-filter: blur(24px);
-  border: 1px solid rgba(255,255,255,0.10);
-  box-shadow: 0 24px 64px rgba(0,0,0,0.7);
+  border: 1px solid var(--glass-border);
+  box-shadow: 0 24px 64px rgba(0,0,0,0.4);
 }
 
-/* -- Formulaires ------------------------------------------- */
+/* -- Formulaires ------------------------------------------ */
 .form-input {
-  background: rgba(255,255,255,0.08);
-  border: 1px solid rgba(255,255,255,0.15);
+  background: var(--input-bg);
+  border: 1px solid var(--input-border);
   border-radius: 0.625rem;
   padding: 0.5rem 0.75rem;
   font-size: 0.875rem;
-  color: white;
+  color: var(--input-text);
   outline: none;
   transition: border-color 0.15s, box-shadow 0.15s;
 }
@@ -70,10 +141,10 @@
 }
 
 .form-input::placeholder {
-  color: rgba(255,255,255,0.3);
+  color: var(--input-placeholder);
 }
 
-/* -- RSS feed ---------------------------------------------- */
+/* -- RSS --------------------------------------------------- */
 .rss-item {
   padding: 0.5rem;
   border-radius: 0.5rem;
@@ -81,14 +152,12 @@
   transition: background 0.15s;
 }
 
-.rss-item:hover {
-  background: rgba(255,255,255,0.07);
-}
+.rss-item:hover { background: var(--rss-hover); }
 
 .rss-item h4 {
   font-size: 0.8125rem;
   font-weight: 500;
-  color: rgba(255,255,255,0.85);
+  color: var(--text-2);
   line-height: 1.35;
   display: -webkit-box;
   -webkit-line-clamp: 2;
@@ -98,13 +167,13 @@
 
 .rss-item .rss-date {
   font-size: 0.6875rem;
-  color: rgba(255,255,255,0.3);
+  color: var(--text-4);
   margin-top: 2px;
 }
 
 .rss-item .rss-desc {
   font-size: 0.75rem;
-  color: rgba(255,255,255,0.45);
+  color: var(--text-3);
   margin-top: 3px;
   display: -webkit-box;
   -webkit-line-clamp: 2;
@@ -112,38 +181,33 @@
   overflow: hidden;
 }
 
-/* -- Weather ---------------------------------------------- */
+/* -- Météo ------------------------------------------------ */
 .weather-temp {
   font-size: 3rem;
   font-weight: 700;
   line-height: 1;
+  color: var(--text-1);
 }
 
-.weather-emoji {
-  font-size: 2.5rem;
-}
+.weather-emoji { font-size: 2.5rem; }
 
 .forecast-day {
   flex: 1;
   text-align: center;
   font-size: 0.6875rem;
-  color: rgba(255,255,255,0.6);
+  color: var(--forecast-color);
 }
 
-/* -- Horloge ---------------------------------------------- */
+/* -- Horloge --------------------------------------------- */
 .clock-time {
   font-variant-numeric: tabular-nums;
   letter-spacing: -1px;
+  color: var(--text-1);
 }
 
-/* -- Modal ------------------------------------------------- */
-#modal-overlay {
-  animation: fade-in 0.15s ease;
-}
-
-.modal-panel {
-  animation: slide-up 0.2s ease;
-}
+/* -- Modal ----------------------------------------------- */
+#modal-overlay { animation: fade-in 0.15s ease; }
+.modal-panel   { animation: slide-up 0.2s ease; }
 
 @keyframes fade-in {
   from { opacity: 0; }
@@ -155,10 +219,9 @@
   to   { transform: translateY(0);    opacity: 1; }
 }
 
-/* -- Admin placeholder ------------------------------------ */
+/* -- Admin ------------------------------------------------ */
 .admin-edit-overlay {
-  position: absolute;
-  inset: 0;
+  position: absolute; inset: 0;
   background: rgba(99,102,241,0.05);
   border-radius: 1rem;
   pointer-events: none;
@@ -166,19 +229,23 @@
   opacity: 0;
 }
 
-.grid-stack-item:hover .admin-edit-overlay {
-  opacity: 1;
-}
+.grid-stack-item:hover .admin-edit-overlay { opacity: 1; }
 
-/* -- Bookmarks grid --------------------------------------- */
-.bookmarks-list a img {
-  object-fit: contain;
-}
+/* -- Bookmarks -------------------------------------------- */
+.bookmarks-list a img { object-fit: contain; }
 
-/* -- Cursor grab pour drag -------------------------------- */
-.widget-header {
-  cursor: grab;
-}
-.widget-header:active {
-  cursor: grabbing;
-}
+/* -- Thème clair : corrections spécifiques ---------------- */
+html.light .widget a.hover\:bg-white\/10:hover,
+html.light .widget .hover\:bg-white\/10:hover { background: var(--hover-bg) !important; }
+
+html.light .widget .border-white\/10 { border-color: rgba(0,0,0,0.08) !important; }
+html.light .widget .bg-white\/5,
+html.light .widget .bg-white\/10 { background: rgba(0,0,0,0.04) !important; }
+
+html.light #app-header .text-white { color: #1e293b !important; }
+html.light #app-header .text-white\/40,
+html.light #app-header .text-white\/50 { color: #64748b !important; }
+html.light #app-header .hover\:text-white:hover { color: #0f172a !important; }
+html.light #app-header .hover\:bg-white\/10:hover { background: rgba(0,0,0,0.06) !important; }
+html.light #app-header .bg-white\/10 { background: rgba(0,0,0,0.06) !important; }
+html.light #app-header .border-white\/20 { border-color: rgba(0,0,0,0.12) !important; }

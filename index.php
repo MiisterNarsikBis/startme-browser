@@ -71,11 +71,11 @@ tailwind.config = {
   style="<?= bg_style($page) ?>; font-family: 'Inter', sans-serif;">
 
 <!-- Fond overlay -->
-<div class="fixed inset-0 bg-black/30 pointer-events-none z-0"></div>
+<div id="body-overlay" class="fixed inset-0 pointer-events-none z-0"></div>
 
 <!-- HEADER -->
-<header class="fixed top-0 left-0 right-0 z-50 flex items-center gap-3 px-4 py-2.5"
-  style="background: rgba(0,0,0,0.45); backdrop-filter: blur(16px); border-bottom: 1px solid rgba(255,255,255,0.08);">
+<header id="app-header" class="fixed top-0 left-0 right-0 z-50 flex items-center gap-3 px-4 py-2.5"
+  style="backdrop-filter: blur(16px);">
 
   <!-- Switcher de pages -->
   <div class="relative" x-data="{ open: false }">
@@ -118,6 +118,11 @@ tailwind.config = {
     class="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-sm font-medium bg-brand/20 hover:bg-brand/40 text-brand transition">
     ✏️ Personnaliser
   </a>
+
+  <!-- Toggle thème -->
+  <button onclick="toggleTheme()" id="theme-toggle"
+    class="flex items-center px-3 py-1.5 rounded-lg text-sm text-white/40 hover:text-white hover:bg-white/10 transition"
+    title="Changer de thème">☀️</button>
 
   <!-- Déconnexion -->
   <button onclick="logout()"
@@ -166,7 +171,7 @@ function renderWidget(array $w): void {
     $type   = $w['type'];
     $title  = htmlspecialchars($w['title'] ?? '');
     echo '<div class="widget h-full flex flex-col rounded-2xl overflow-hidden"
-               style="background:rgba(15,23,42,0.75);backdrop-filter:blur(16px);border:1px solid rgba(255,255,255,0.08);"
+               style="backdrop-filter:blur(16px);border:1px solid var(--widget-border);"
                data-widget-id="' . $id . '" data-widget-type="' . $type . '">';
     echo '<div class="widget-header flex items-center gap-2 px-4 py-2.5 border-b border-white/10">';
     echo '<span class="font-semibold text-sm text-white/80 flex-1">' . $title . '</span>';
