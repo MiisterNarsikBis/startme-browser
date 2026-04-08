@@ -67,5 +67,6 @@ match ($resource) {
     'todos'     => require __DIR__ . '/resources/todos.php',
     'weather'   => require __DIR__ . '/resources/weather.php',
     'rss'       => require __DIR__ . '/resources/rss.php',
+    'upload'    => require __DIR__ . '/resources/upload.php',
     default     => json_error('Ressource inconnue.', 404),
 };

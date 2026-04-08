@@ -433,7 +433,7 @@ const adminApp = {
     const formData = new FormData();
     formData.append('bg', file);
 
-    const res = await fetch(`${BASE_URL}/api/upload.php?page_id=${PAGE_ID}`, {
+    const res = await fetch(`${BASE_URL}/api/v1/upload?page_id=${PAGE_ID}`, {
       method: 'POST',
       body: formData,
     });
