@@ -1,5 +1,6 @@
 # Configuration sensible — ne jamais committer
 config.php
+.deployDev.sh
 
 # Uploads utilisateur
 assets/uploads/
