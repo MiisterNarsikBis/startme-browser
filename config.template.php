@@ -3,9 +3,9 @@
 //  config.php — Copier ce fichier en config.php et adapter
 // ============================================================
 
-// DEBUG — désactiver en production
-ini_set('display_errors', 1);
-ini_set('display_startup_errors', 1);
+// DEBUG — mettre à 0 en production
+ini_set('display_errors', 0);
+ini_set('display_startup_errors', 0);
 error_reporting(E_ALL);
 
 define('DB_HOST', '127.0.0.1');
