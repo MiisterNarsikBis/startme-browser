@@ -144,6 +144,27 @@ html.light {
   color: var(--input-placeholder);
 }
 
+/* Les <select> et leurs options ont besoin de couleurs explicites */
+select.form-input {
+  color-scheme: dark;
+}
+
+html.light select.form-input {
+  color-scheme: light;
+  color: #0f172a;
+  background-color: #f8fafc;
+}
+
+select.form-input option {
+  background: #1e293b;
+  color: #f1f5f9;
+}
+
+html.light select.form-input option {
+  background: #f8fafc;
+  color: #0f172a;
+}
+
 /* -- RSS --------------------------------------------------- */
 .rss-item {
   padding: 0.5rem;
