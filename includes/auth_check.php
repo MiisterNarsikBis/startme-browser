@@ -53,6 +53,12 @@ function require_auth(): int {
         header('Location: ' . BASE_URL . '/auth.php');
         exit;
     }
+    // Afficher les erreurs PHP uniquement pour l'admin (user_id = 1)
+    if ($uid === 1) {
+        ini_set('display_errors', 1);
+        ini_set('display_startup_errors', 1);
+        error_reporting(E_ALL);
+    }
     return $uid;
 }
 
