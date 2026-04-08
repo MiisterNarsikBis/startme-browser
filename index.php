@@ -62,7 +62,7 @@ tailwind.config = {
 <!-- Alpine.js -->
 <script defer src="https://cdn.jsdelivr.net/npm/alpinejs@3/dist/cdn.min.js"></script>
 
-<link rel="stylesheet" href="<?= BASE_URL ?>/assets/css/app.css">
+<link rel="stylesheet" href="<?= BASE_URL ?>/assets/css/app.css?v=<?= filemtime(__DIR__.'/assets/css/app.css') ?>">
 <?php if ($page['bg_type'] === 'image' && !empty($page['bg_value'])): ?>
 <link rel="preload" as="image" href="<?= htmlspecialchars($page['bg_value']) ?>">
 <?php endif; ?>
@@ -147,7 +147,7 @@ tailwind.config = {
   </div>
 </main>
 
-<script src="<?= BASE_URL ?>/assets/js/app.js"></script>
+<script src="<?= BASE_URL ?>/assets/js/app.js?v=<?= filemtime(__DIR__.'/assets/js/app.js') ?>"></script>
 <script>
 const BASE_URL = '<?= BASE_URL ?>';
 const PAGE_SLUG = '<?= htmlspecialchars($slug) ?>';

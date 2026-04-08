@@ -65,6 +65,7 @@ async function saveGridLayout() {
 // ----------------------------------------------------------------
 // RSS — chargement et onglets
 // ----------------------------------------------------------------
+const rssFetchVersion = {}; // anti-race : seul le dernier fetch par widget s'affiche
 async function loadRss(widgetId) {
   const container = document.querySelector(`.rss-feed-container[data-widget-id="${widgetId}"]`);
   if (!container) return;
@@ -75,10 +76,24 @@ async function loadRss(widgetId) {
     return;
   }
 
+  // Charger l'onglet actif en priorité (affiché immédiatement)
   await loadRssFeed(container, widgetId, url);
+
+  // Pré-charger les autres flux en arrière-plan pour réchauffer le cache
+  try {
+    const feeds = JSON.parse(container.dataset.feeds || '[]');
+    feeds.forEach(f => {
+      if (f.url !== url) {
+        apiFetch(`/api/v1/rss?widget_id=${widgetId}&url=${encodeURIComponent(f.url)}`, null, 'GET').catch(() => {});
+      }
+    });
+  } catch (_) {}
 }
 
 async function loadRssFeed(container, widgetId, url) {
+  rssFetchVersion[widgetId] = (rssFetchVersion[widgetId] || 0) + 1;
+  const myVersion = rssFetchVersion[widgetId];
+
   container.innerHTML = `<div class="flex items-center gap-2 text-white/30 text-sm py-4">
     <svg class="animate-spin w-4 h-4" fill="none" viewBox="0 0 24 24">
       <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"/>
@@ -91,8 +106,8 @@ async function loadRssFeed(container, widgetId, url) {
       null, 'GET'
     );
 
-    // Ignorer si l'onglet a changé pendant le chargement
-    if (container.dataset.currentUrl !== url) return;
+    // Ignorer si un fetch plus récent a démarré entre-temps
+    if (rssFetchVersion[widgetId] !== myVersion) return;
 
     const items = data.items ?? data;
     const cachedAt = data.cached_at ?? null;
