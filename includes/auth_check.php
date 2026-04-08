@@ -29,8 +29,12 @@ function get_current_user_id(): ?int {
         if ($row) {
             $uid = (int)$row['user_id'];
             login_user($uid);
-            // Renouveler le cookie à chaque visite (contourne le cap navigateur)
-            setcookie('remember_me', $token, [
+            // Rotation : nouveau token, invalide l'ancien (sécurité vol de cookie)
+            // Chaque device a sa propre ligne → les autres navigateurs ne sont pas affectés
+            $newToken = bin2hex(random_bytes(32));
+            $newHash  = hash('sha256', $newToken);
+            db_query('UPDATE remember_tokens SET token_hash = ? WHERE token_hash = ?', [$newHash, $hash]);
+            setcookie('remember_me', $newToken, [
                 'expires'  => time() + 10 * 365 * 24 * 3600,
                 'path'     => '/',
                 'secure'   => isset($_SERVER['HTTPS']),
