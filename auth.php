@@ -18,6 +18,7 @@ if ($uid) {
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Connexion — Startme</title>
+<link rel="icon" type="image/svg+xml" href="<?= BASE_URL ?>/assets/favicon.svg">
 <script src="https://cdn.tailwindcss.com"></script>
 <script>
 tailwind.config = {
