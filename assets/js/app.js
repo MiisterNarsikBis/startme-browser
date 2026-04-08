@@ -66,6 +66,8 @@ async function saveGridLayout() {
 // RSS — chargement et onglets
 // ----------------------------------------------------------------
 const rssFetchVersion = {}; // anti-race : seul le dernier fetch par widget s'affiche
+const rssPageCache   = {}; // cache JS en mémoire : pas de re-fetch lors des switch d'onglets
+
 async function loadRss(widgetId) {
   const container = document.querySelector(`.rss-feed-container[data-widget-id="${widgetId}"]`);
   if (!container) return;
@@ -83,6 +85,13 @@ async function loadRssFeed(container, widgetId, url) {
   rssFetchVersion[widgetId] = (rssFetchVersion[widgetId] || 0) + 1;
   const myVersion = rssFetchVersion[widgetId];
 
+  // Cache JS : affichage instantané sans appel réseau
+  const cacheKey = `${widgetId}__${url}`;
+  if (rssPageCache[cacheKey]) {
+    renderRssFeedData(container, widgetId, rssPageCache[cacheKey]);
+    return;
+  }
+
   container.innerHTML = `<div class="flex items-center gap-2 text-white/30 text-sm py-4">
     <svg class="animate-spin w-4 h-4" fill="none" viewBox="0 0 24 24">
       <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"/>
@@ -98,42 +107,46 @@ async function loadRssFeed(container, widgetId, url) {
     // Ignorer si un fetch plus récent a démarré entre-temps
     if (rssFetchVersion[widgetId] !== myVersion) return;
 
-    const items = data.items ?? data;
-    const cachedAt = data.cached_at ?? null;
-
-    // Afficher la date de cache discrètement (top-right du bloc RSS)
-    const cacheLabel = container.closest('.relative')?.querySelector(`.rss-cached-at[data-widget-id="${widgetId}"]`);
-    if (cacheLabel && cachedAt) {
-      const d = new Date(cachedAt.replace(' ', 'T'));
-      const diffMin = Math.round((Date.now() - d) / 60000);
-      let label;
-      if (diffMin < 1)        label = 'à l\'instant';
-      else if (diffMin < 60)  label = `il y a ${diffMin} min`;
-      else if (diffMin < 1440) label = `il y a ${Math.round(diffMin / 60)}h`;
-      else                    label = d.toLocaleDateString('fr-FR', { day: 'numeric', month: 'short' });
-      cacheLabel.textContent = label;
-      cacheLabel.title = cachedAt;
-    }
-
-    if (!items.length) {
-      container.innerHTML = '<p class="text-white/30 text-sm py-4 text-center">Aucun article disponible.</p>';
-      return;
-    }
-
-    container.innerHTML = items.map(item => {
-      const date = item.date
-        ? new Date(item.date).toLocaleDateString('fr-FR', { day: 'numeric', month: 'short' })
-        : '';
-      return `<a href="${escHtml(item.link)}" target="_blank" rel="noopener" class="rss-item block">
-        <h4>${escHtml(item.title)}</h4>
-        ${date ? `<div class="rss-date">${escHtml(date)}</div>` : ''}
-        ${item.desc ? `<div class="rss-desc">${escHtml(item.desc)}</div>` : ''}
-      </a>`;
-    }).join('<hr class="border-white/5 my-0.5">');
+    rssPageCache[cacheKey] = data; // mémoriser pour les prochains switch
+    renderRssFeedData(container, widgetId, data);
 
   } catch (e) {
     container.innerHTML = `<p class="text-red-400/60 text-sm py-2 text-center">Erreur : ${escHtml(e.message)}</p>`;
   }
+}
+
+function renderRssFeedData(container, widgetId, data) {
+  const items    = data.items ?? data;
+  const cachedAt = data.cached_at ?? null;
+
+  const cacheLabel = container.closest('.relative')?.querySelector(`.rss-cached-at[data-widget-id="${widgetId}"]`);
+  if (cacheLabel && cachedAt) {
+    const d = new Date(cachedAt.replace(' ', 'T'));
+    const diffMin = Math.round((Date.now() - d) / 60000);
+    let label;
+    if (diffMin < 1)         label = 'à l\'instant';
+    else if (diffMin < 60)   label = `il y a ${diffMin} min`;
+    else if (diffMin < 1440) label = `il y a ${Math.round(diffMin / 60)}h`;
+    else                     label = d.toLocaleDateString('fr-FR', { day: 'numeric', month: 'short' });
+    cacheLabel.textContent = label;
+    cacheLabel.title = cachedAt;
+  }
+
+  if (!items.length) {
+    container.innerHTML = '<p class="text-white/30 text-sm py-4 text-center">Aucun article disponible.</p>';
+    return;
+  }
+
+  container.innerHTML = items.map(item => {
+    const date = item.date
+      ? new Date(item.date).toLocaleDateString('fr-FR', { day: 'numeric', month: 'short' })
+      : '';
+    return `<a href="${escHtml(item.link)}" target="_blank" rel="noopener" class="rss-item block">
+      <h4>${escHtml(item.title)}</h4>
+      ${date ? `<div class="rss-date">${escHtml(date)}</div>` : ''}
+      ${item.desc ? `<div class="rss-desc">${escHtml(item.desc)}</div>` : ''}
+    </a>`;
+  }).join('<hr class="border-white/5 my-0.5">');
 }
 
 function switchRssTab(btn, widgetId) {

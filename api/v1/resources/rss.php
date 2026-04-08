@@ -2,6 +2,7 @@
 /* GET /api/v1/rss?url=X&widget_id=X */
 
 if ($method !== 'GET') json_error('Méthode non autorisée.', 405);
+header('Cache-Control: no-store');
 
 $widget_id = (int)($_GET['widget_id'] ?? 0);
 $feed_url  = trim($_GET['url'] ?? '');
