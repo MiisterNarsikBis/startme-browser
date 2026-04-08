@@ -47,7 +47,7 @@ const adminApp = {
     const def = defaults[type] || { title: type, config: {}, w: 3, h: 4 };
 
     try {
-      const res = await apiFetch('/api/widgets.php?action=create', {
+      const res = await apiFetch('/api/v1/widgets', {
         page_id: PAGE_ID,
         type,
         title:   def.title,
@@ -312,7 +312,7 @@ const adminApp = {
     if (!list) return;
 
     try {
-      const bookmarks = await apiFetch(`/api/widgets.php?page_id=-1`, null, 'GET').catch(() => []);
+      const bookmarks = await apiFetch(`/api/v1/widgets?page_id=-1`, null, 'GET').catch(() => []);
       // Charger via widgets API n'est pas le bon endpoint ici — on fait autrement
       // Pour l'instant on affiche un message
       list.innerHTML = '<p class="text-xs text-white/30 py-1">Rechargez après avoir sauvegardé.</p>';
@@ -328,7 +328,7 @@ const adminApp = {
     const url   = document.getElementById('bm-url')?.value.trim();
     if (!url) { alert('URL requise.'); return; }
 
-    await apiFetch('/api/bookmarks.php?action=create', {
+    await apiFetch('/api/v1/bookmarks', {
       widget_id: this.currentWidgetId,
       title: title || url,
       url,
@@ -375,7 +375,7 @@ const adminApp = {
         break;
     }
 
-    await apiFetch(`/api/widgets.php?action=update&id=${id}`, { title, config });
+    await apiFetch(`/api/v1/widgets/${id}`, { title, config }, 'PUT');
 
     // Mettre à jour le titre dans la grille
     const header = document.querySelector(`[data-widget-id="${id}"] .widget-header .font-semibold`);
@@ -386,7 +386,7 @@ const adminApp = {
 
   async deleteWidget(id) {
     if (!confirm('Supprimer ce widget ?')) return;
-    await apiFetch(`/api/widgets.php?action=delete&id=${id}`, {});
+    await apiFetch(`/api/v1/widgets/${id}`, null, 'DELETE');
 
     // Retirer de la grille
     const el = document.querySelector(`.grid-stack-item[gs-id="${id}"]`);
@@ -468,9 +468,9 @@ const adminApp = {
         break;
     }
 
-    await apiFetch(`/api/pages.php?action=update&id=${pageId}`, {
+    await apiFetch(`/api/v1/pages/${pageId}`, {
       name, icon, bg_type: bgType, bg_value: bgValue,
-    });
+    }, 'PUT');
 
     // Appliquer le fond sans reload
     document.body.style.background = bgType === 'image'
@@ -483,7 +483,7 @@ const adminApp = {
   async deletePage(pageId) {
     if (!confirm('Supprimer cette page et tous ses widgets ? Cette action est irréversible.')) return;
     try {
-      await apiFetch(`/api/pages.php?action=delete&id=${pageId}`, {});
+      await apiFetch(`/api/v1/pages/${pageId}`, null, 'DELETE');
       window.location.href = BASE_URL + '/';
     } catch(e) {
       alert(e.message);
@@ -498,7 +498,7 @@ const adminApp = {
     const icon = document.getElementById('new-page-icon')?.value.trim() || '📄';
     if (!name) { alert('Nom requis.'); return; }
 
-    const res = await apiFetch('/api/pages.php?action=create', { name, icon });
+    const res = await apiFetch('/api/v1/pages', { name, icon });
     window.location.href = `${BASE_URL}/admin.php?page=${res.slug}`;
   },
 };

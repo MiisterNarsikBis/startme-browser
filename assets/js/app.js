@@ -59,7 +59,7 @@ async function saveGridLayout() {
     x: n.x, y: n.y, w: n.w, h: n.h,
   }));
 
-  await apiFetch('/api/widgets.php?action=move', { items });
+  await apiFetch('/api/v1/widgets/reorder', { items });
 }
 
 // ----------------------------------------------------------------
@@ -87,7 +87,7 @@ async function loadRssFeed(container, widgetId, url) {
 
   try {
     const data = await apiFetch(
-      `/api/rss.php?widget_id=${widgetId}&url=${encodeURIComponent(url)}`,
+      `/api/v1/rss?widget_id=${widgetId}&url=${encodeURIComponent(url)}`,
       null, 'GET'
     );
 
@@ -255,9 +255,9 @@ async function loadWeather(widgetId, city = null, lat = null, lon = null, name =
   try {
     let url;
     if (lat !== null && lon !== null) {
-      url = `/api/weather.php?widget_id=${widgetId}&lat=${lat}&lon=${lon}&name=${encodeURIComponent(name || '')}`;
+      url = `/api/v1/weather?widget_id=${widgetId}&lat=${lat}&lon=${lon}&name=${encodeURIComponent(name || '')}`;
     } else {
-      url = `/api/weather.php?widget_id=${widgetId}&city=${encodeURIComponent(city)}`;
+      url = `/api/v1/weather?widget_id=${widgetId}&city=${encodeURIComponent(city)}`;
     }
     const d = await apiFetch(url, null, 'GET');
 
@@ -327,7 +327,7 @@ function debounceSaveNote(widgetId, content) {
 }
 
 async function saveNote(widgetId, content) {
-  await apiFetch('/api/bookmarks.php?action=save_note', { widget_id: widgetId, content });
+  await apiFetch('/api/v1/notes', { widget_id: widgetId, content });
 }
 
 // ----------------------------------------------------------------
@@ -339,7 +339,7 @@ async function addTodo(e, widgetId) {
   const title = input.value.trim();
   if (!title) return;
 
-  const res = await apiFetch('/api/bookmarks.php?action=todo_add', { widget_id: widgetId, title });
+  const res = await apiFetch('/api/v1/todos', { widget_id: widgetId, title });
   if (res.id) {
     const list = document.querySelector(`.todo-list[data-widget-id="${widgetId}"]`);
     if (list) {
@@ -359,7 +359,7 @@ async function addTodo(e, widgetId) {
 
 async function toggleTodo(id, checkbox) {
   const span = checkbox.parentElement.querySelector('span');
-  await apiFetch(`/api/bookmarks.php?action=todo_toggle&id=${id}`, {});
+  await apiFetch(`/api/v1/todos/${id}`, {}, 'PUT');
   if (checkbox.checked) {
     span.classList.add('line-through', 'text-white/30');
     span.classList.remove('text-white/80');
@@ -370,12 +370,12 @@ async function toggleTodo(id, checkbox) {
 }
 
 async function deleteTodo(id, label) {
-  await apiFetch(`/api/bookmarks.php?action=todo_delete&id=${id}`, {});
+  await apiFetch(`/api/v1/todos/${id}`, null, 'DELETE');
   label.remove();
 }
 
 async function deleteBookmark(id, el) {
-  await apiFetch(`/api/bookmarks.php?action=delete&id=${id}`, {});
+  await apiFetch(`/api/v1/bookmarks/${id}`, null, 'DELETE');
   el.remove();
 }
 
@@ -393,7 +393,7 @@ function initBookmarksSortable() {
       onEnd: async () => {
         const widgetId = parseInt(list.dataset.widgetId);
         const order    = [...list.children].map(el => parseInt(el.dataset.id)).filter(Boolean);
-        await apiFetch('/api/bookmarks.php?action=reorder', { widget_id: widgetId, order });
+        await apiFetch('/api/v1/bookmarks/reorder', { widget_id: widgetId, order });
       },
     });
   });
@@ -430,7 +430,7 @@ applyTheme(localStorage.getItem('theme') || 'dark');
 // Auth
 // ----------------------------------------------------------------
 async function logout() {
-  await apiFetch('/api/auth.php?action=logout', {});
+  await apiFetch('/api/v1/auth/logout', {});
   window.location.href = BASE_URL + '/auth.php';
 }
 

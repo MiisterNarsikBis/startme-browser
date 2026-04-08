@@ -63,6 +63,8 @@ match ($resource) {
     'pages'     => require __DIR__ . '/resources/pages.php',
     'widgets'   => require __DIR__ . '/resources/widgets.php',
     'bookmarks' => require __DIR__ . '/resources/bookmarks.php',
+    'notes'     => require __DIR__ . '/resources/notes.php',
+    'todos'     => require __DIR__ . '/resources/todos.php',
     'weather'   => require __DIR__ . '/resources/weather.php',
     'rss'       => require __DIR__ . '/resources/rss.php',
     default     => json_error('Ressource inconnue.', 404),
