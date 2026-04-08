@@ -4,6 +4,8 @@ Page de démarrage personnalisée auto-hébergée, servie par PHP + MySQL.
 
 > **Projet personnel** — Fait pour un usage perso. Le code est fourni tel quel, sans garantie d'aucune sorte.
 
+**Site démo :** https://start.miisternarsik.fr/
+
 ## Fonctionnalités
 
 - Gestion de marque-pages (affichage grille ou liste, suppression au survol)
