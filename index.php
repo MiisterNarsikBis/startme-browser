@@ -170,10 +170,6 @@ function renderWidget(array $w): void {
                data-widget-id="' . $id . '" data-widget-type="' . $type . '">';
     echo '<div class="widget-header flex items-center gap-2 px-4 py-2.5 border-b border-white/10">';
     echo '<span class="font-semibold text-sm text-white/80 flex-1">' . $title . '</span>';
-    if ($type === 'weather') {
-        echo '<button onclick="toggleWeatherSearch(' . $id . ')"
-                class="text-white/30 hover:text-white/70 transition text-sm" title="Changer de ville">🔍</button>';
-    }
     echo '</div>';
     echo '<div class="widget-body flex-1 overflow-auto p-3">';
 
@@ -342,14 +338,7 @@ function renderWeather(int $id, array $config): void {
         echo '<p class="text-white/40 text-sm text-center py-4">Configurez une ville dans les paramètres du widget.</p>';
         return;
     }
-    echo '<div class="flex flex-col gap-1.5 h-full">
-            <form id="weather-form-' . $id . '" onsubmit="searchWeather(event,' . $id . ')" class="hidden flex gap-1.5">
-              <input id="weather-search-' . $id . '" type="text" placeholder="Ville ou code postal…"
-                class="flex-1 bg-white/5 border border-white/10 rounded-lg px-2.5 py-1.5 text-sm text-white placeholder-white/30 focus:outline-none focus:border-brand/50 min-w-0">
-              <button type="submit"
-                class="bg-brand/20 hover:bg-brand/40 border border-brand/30 rounded-lg px-2.5 py-1.5 text-sm text-brand transition">→</button>
-            </form>
-            <div class="weather-container flex-1" data-widget-id="' . $id . '" data-city="' . $city . '">
+    echo '<div class="weather-container h-full" data-widget-id="' . $id . '" data-city="' . $city . '">
               <div class="text-white/30 text-sm py-4 text-center">⏳ Chargement météo…</div>
             </div>
           </div>';
