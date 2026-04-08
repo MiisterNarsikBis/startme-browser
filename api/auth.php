@@ -41,6 +41,7 @@ if ($method === 'POST' && $action === 'login') {
     $hash = seedToHash($cleaned);
     $uid  = find_or_create_user($hash);
     login_user($uid);
+    set_remember_token($uid);
 
     $pages = get_user_pages($uid);
     $first = $pages[0]['slug'] ?? 'accueil';

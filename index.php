@@ -169,6 +169,10 @@ function renderWidget(array $w): void {
                data-widget-id="' . $id . '" data-widget-type="' . $type . '">';
     echo '<div class="widget-header flex items-center gap-2 px-4 py-2.5 border-b border-white/10">';
     echo '<span class="font-semibold text-sm text-white/80 flex-1">' . $title . '</span>';
+    if ($type === 'weather') {
+        echo '<button onclick="toggleWeatherSearch(' . $id . ')"
+                class="text-white/30 hover:text-white/70 transition text-sm" title="Changer de ville">🔍</button>';
+    }
     echo '</div>';
     echo '<div class="widget-body flex-1 overflow-auto p-3">';
 
@@ -197,21 +201,38 @@ function renderBookmarks(int $id, array $config): void {
     echo '<div class="bookmarks-list ' . ($display === 'list' ? 'flex flex-col gap-1' : 'grid grid-cols-3 gap-2') . '"
               data-widget-id="' . $id . '">';
     foreach ($bookmarks as $bm) {
-        $favicon = htmlspecialchars($bm['favicon'] ?: 'https://www.google.com/s2/favicons?sz=64&domain=' . parse_url($bm['url'], PHP_URL_HOST));
+        $bmId    = (int)$bm['id'];
+        // Si le favicon n'est pas encore en cache local, le télécharger maintenant
+        $rawFavicon = $bm['favicon'] ?: '';
+        if (!$rawFavicon || str_contains($rawFavicon, 'google.com/s2/favicons')) {
+            $rawFavicon = get_favicon($bm['url']);
+            if ($bm['favicon'] !== $rawFavicon) {
+                db_query('UPDATE bookmarks SET favicon=? WHERE id=?', [$rawFavicon, $bm['id']]);
+            }
+        }
+        $favicon = htmlspecialchars($rawFavicon);
         $title   = htmlspecialchars($bm['title']);
         $url     = htmlspecialchars($bm['url']);
         if ($display === 'list') {
-            echo '<a href="' . $url . '" target="_blank"
-                   class="flex items-center gap-2.5 px-2 py-1.5 rounded-lg hover:bg-white/10 transition group">
-                   <img src="' . $favicon . '" class="w-4 h-4 rounded" onerror="this.src=\'data:image/svg+xml,<svg xmlns=&quot;http://www.w3.org/2000/svg&quot; viewBox=&quot;0 0 24 24&quot;><circle cx=&quot;12&quot; cy=&quot;12&quot; r=&quot;10&quot; fill=&quot;%236366f1&quot;/></svg>\'">
-                   <span class="text-sm text-white/80 group-hover:text-white truncate">' . $title . '</span>
-                 </a>';
+            echo '<div class="relative group/bm flex items-center">
+                   <a href="' . $url . '" target="_blank"
+                      class="flex-1 flex items-center gap-2.5 px-2 py-1.5 pr-7 rounded-lg hover:bg-white/10 transition">
+                     <img src="' . $favicon . '" class="w-4 h-4 rounded flex-shrink-0" onerror="this.src=\'data:image/svg+xml,<svg xmlns=&quot;http://www.w3.org/2000/svg&quot; viewBox=&quot;0 0 24 24&quot;><circle cx=&quot;12&quot; cy=&quot;12&quot; r=&quot;10&quot; fill=&quot;%236366f1&quot;/></svg>\'">
+                     <span class="text-sm text-white/80 truncate">' . $title . '</span>
+                   </a>
+                   <button onclick="deleteBookmark(' . $bmId . ', this.closest(\'div\'))"
+                     class="absolute right-1.5 opacity-0 group-hover/bm:opacity-100 text-white/30 hover:text-red-400 transition-opacity text-xs leading-none p-0.5">✕</button>
+                 </div>';
         } else {
-            echo '<a href="' . $url . '" target="_blank"
-                   class="flex flex-col items-center gap-1.5 p-2 rounded-xl hover:bg-white/10 transition group text-center">
-                   <img src="' . $favicon . '" class="w-8 h-8 rounded-lg" onerror="this.src=\'data:image/svg+xml,<svg xmlns=&quot;http://www.w3.org/2000/svg&quot; viewBox=&quot;0 0 24 24&quot;><circle cx=&quot;12&quot; cy=&quot;12&quot; r=&quot;10&quot; fill=&quot;%236366f1&quot;/></svg>\'">
-                   ' . ($showTitle ? '<span class="text-xs text-white/60 group-hover:text-white truncate max-w-full">' . $title . '</span>' : '') . '
-                 </a>';
+            echo '<div class="relative group/bm">
+                   <a href="' . $url . '" target="_blank"
+                      class="flex flex-col items-center gap-1.5 p-2 rounded-xl hover:bg-white/10 transition group text-center w-full">
+                     <img src="' . $favicon . '" class="w-8 h-8 rounded-lg" onerror="this.src=\'data:image/svg+xml,<svg xmlns=&quot;http://www.w3.org/2000/svg&quot; viewBox=&quot;0 0 24 24&quot;><circle cx=&quot;12&quot; cy=&quot;12&quot; r=&quot;10&quot; fill=&quot;%236366f1&quot;/></svg>\'">
+                     ' . ($showTitle ? '<span class="text-xs text-white/60 group-hover:text-white truncate max-w-full">' . $title . '</span>' : '') . '
+                   </a>
+                   <button onclick="deleteBookmark(' . $bmId . ', this.closest(\'div\'))"
+                     class="absolute top-0.5 right-0.5 opacity-0 group-hover/bm:opacity-100 text-white/30 hover:text-red-400 transition-opacity text-[10px] leading-none bg-black/40 rounded p-0.5">✕</button>
+                 </div>';
         }
     }
     echo '</div>';
@@ -320,8 +341,16 @@ function renderWeather(int $id, array $config): void {
         echo '<p class="text-white/40 text-sm text-center py-4">Configurez une ville dans les paramètres du widget.</p>';
         return;
     }
-    echo '<div class="weather-container" data-widget-id="' . $id . '" data-city="' . $city . '">
-            <div class="text-white/30 text-sm py-4 text-center">⏳ Chargement météo…</div>
+    echo '<div class="flex flex-col gap-1.5 h-full">
+            <form id="weather-form-' . $id . '" onsubmit="searchWeather(event,' . $id . ')" class="hidden flex gap-1.5">
+              <input id="weather-search-' . $id . '" type="text" placeholder="Ville ou code postal…"
+                class="flex-1 bg-white/5 border border-white/10 rounded-lg px-2.5 py-1.5 text-sm text-white placeholder-white/30 focus:outline-none focus:border-brand/50 min-w-0">
+              <button type="submit"
+                class="bg-brand/20 hover:bg-brand/40 border border-brand/30 rounded-lg px-2.5 py-1.5 text-sm text-brand transition">→</button>
+            </form>
+            <div class="weather-container flex-1" data-widget-id="' . $id . '" data-city="' . $city . '">
+              <div class="text-white/30 text-sm py-4 text-center">⏳ Chargement météo…</div>
+            </div>
           </div>';
 }
 

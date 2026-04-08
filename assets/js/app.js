@@ -127,12 +127,119 @@ function switchRssTab(btn, widgetId) {
 // ----------------------------------------------------------------
 // Météo
 // ----------------------------------------------------------------
-async function loadWeather(widgetId, city) {
+function toggleWeatherSearch(widgetId) {
+  const form = document.getElementById(`weather-form-${widgetId}`);
+  form.classList.toggle('hidden');
+  if (!form.classList.contains('hidden')) {
+    const input = document.getElementById(`weather-search-${widgetId}`);
+    input.focus();
+    setupWeatherAutocomplete(widgetId);
+  } else {
+    closeWeatherDropdown(widgetId);
+  }
+}
+
+function setupWeatherAutocomplete(widgetId) {
+  const input = document.getElementById(`weather-search-${widgetId}`);
+  if (input.dataset.acReady) return;
+  input.dataset.acReady = '1';
+
+  let timer;
+  input.addEventListener('input', () => {
+    clearTimeout(timer);
+    const q = input.value.trim();
+    if (q.length < 2) { closeWeatherDropdown(widgetId); return; }
+    timer = setTimeout(() => fetchWeatherSuggestions(widgetId, q), 300);
+  });
+
+  input.addEventListener('keydown', e => {
+    if (e.key === 'Escape') {
+      closeWeatherDropdown(widgetId);
+      document.getElementById(`weather-form-${widgetId}`).classList.add('hidden');
+    }
+  });
+
+  document.addEventListener('click', e => {
+    const form = document.getElementById(`weather-form-${widgetId}`);
+    if (form && !form.contains(e.target)) closeWeatherDropdown(widgetId);
+  }, { passive: true });
+}
+
+async function fetchWeatherSuggestions(widgetId, query) {
+  try {
+    const url = `https://geocoding-api.open-meteo.com/v1/search?name=${encodeURIComponent(query)}&count=6&language=fr&format=json`;
+    const res  = await fetch(url);
+    const data = await res.json();
+    renderWeatherDropdown(widgetId, data.results || []);
+  } catch {
+    closeWeatherDropdown(widgetId);
+  }
+}
+
+function renderWeatherDropdown(widgetId, results) {
+  closeWeatherDropdown(widgetId);
+  if (!results.length) return;
+
+  const form = document.getElementById(`weather-form-${widgetId}`);
+  form.style.position = 'relative';
+
+  const dropdown = document.createElement('div');
+  dropdown.id = `weather-ac-${widgetId}`;
+  dropdown.style.cssText = 'position:absolute;top:100%;left:0;right:0;margin-top:4px;z-index:50;border-radius:12px;overflow:hidden;background:rgba(15,23,42,0.97);border:1px solid rgba(255,255,255,0.12);backdrop-filter:blur(20px)';
+
+  results.forEach(r => {
+    const sub = [r.admin1, r.country].filter(Boolean).join(', ');
+    const btn = document.createElement('button');
+    btn.type = 'button';
+    btn.style.cssText = 'display:flex;align-items:center;gap:8px;width:100%;text-align:left;padding:8px 12px;background:transparent;border:none;cursor:pointer;transition:background .15s';
+    btn.innerHTML = `<span style="color:#fff;font-size:.875rem;font-weight:500;flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${escHtml(r.name)}</span>`
+                  + `<span style="color:rgba(255,255,255,.35);font-size:.75rem;white-space:nowrap">${escHtml(sub)}</span>`;
+    btn.addEventListener('mouseenter', () => btn.style.background = 'rgba(255,255,255,.08)');
+    btn.addEventListener('mouseleave', () => btn.style.background = 'transparent');
+    btn.addEventListener('click', () => selectWeatherLocation(widgetId, r.latitude, r.longitude, r.name));
+    dropdown.appendChild(btn);
+  });
+
+  form.appendChild(dropdown);
+}
+
+function closeWeatherDropdown(widgetId) {
+  document.getElementById(`weather-ac-${widgetId}`)?.remove();
+}
+
+function selectWeatherLocation(widgetId, lat, lon, name) {
+  closeWeatherDropdown(widgetId);
+  const input = document.getElementById(`weather-search-${widgetId}`);
+  input.value = '';
+  document.getElementById(`weather-form-${widgetId}`).classList.add('hidden');
+  loadWeather(widgetId, null, lat, lon, name);
+}
+
+// searchWeather (fallback soumission formulaire sans sélection dropdown)
+function searchWeather(e, widgetId) {
+  e.preventDefault();
+  const input = document.getElementById(`weather-search-${widgetId}`);
+  const city  = input.value.trim();
+  if (!city) return;
+  closeWeatherDropdown(widgetId);
+  document.getElementById(`weather-form-${widgetId}`).classList.add('hidden');
+  input.value = '';
+  loadWeather(widgetId, city);
+}
+
+async function loadWeather(widgetId, city = null, lat = null, lon = null, name = null) {
   const container = document.querySelector(`.weather-container[data-widget-id="${widgetId}"]`);
   if (!container) return;
+  container.innerHTML = '<div class="text-white/30 text-sm py-4 text-center">⏳ Chargement météo…</div>';
 
   try {
-    const d = await apiFetch(`/api/weather.php?widget_id=${widgetId}&city=${encodeURIComponent(city)}`, null, 'GET');
+    let url;
+    if (lat !== null && lon !== null) {
+      url = `/api/weather.php?widget_id=${widgetId}&lat=${lat}&lon=${lon}&name=${encodeURIComponent(name || '')}`;
+    } else {
+      url = `/api/weather.php?widget_id=${widgetId}&city=${encodeURIComponent(city)}`;
+    }
+    const d = await apiFetch(url, null, 'GET');
 
     const forecastHtml = d.forecast.map((day, i) => {
       const label = i === 0 ? 'Auj.' : new Date(day.date + 'T12:00:00').toLocaleDateString('fr-FR', { weekday: 'short' });
@@ -245,6 +352,11 @@ async function toggleTodo(id, checkbox) {
 async function deleteTodo(id, label) {
   await apiFetch(`/api/bookmarks.php?action=todo_delete&id=${id}`, {});
   label.remove();
+}
+
+async function deleteBookmark(id, el) {
+  await apiFetch(`/api/bookmarks.php?action=delete&id=${id}`, {});
+  el.remove();
 }
 
 // ----------------------------------------------------------------

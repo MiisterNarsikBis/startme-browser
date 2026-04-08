@@ -28,7 +28,31 @@ function slugify(string $text): string {
 function get_favicon(string $url): string {
     $host = parse_url($url, PHP_URL_HOST);
     if (!$host) return '';
-    return 'https://www.google.com/s2/favicons?sz=64&domain=' . urlencode($host);
+
+    $dir      = UPLOAD_DIR . 'favicons/';
+    $filename = md5($host) . '.png';
+    $filepath = $dir . $filename;
+    $fileurl  = UPLOAD_URL . 'favicons/' . $filename;
+
+    // Cache valide (< 30 jours)
+    if (file_exists($filepath) && (time() - filemtime($filepath)) < 30 * 86400) {
+        return $fileurl;
+    }
+
+    // Télécharger depuis Google Favicon API
+    if (!is_dir($dir)) mkdir($dir, 0755, true);
+
+    $google_url = 'https://www.google.com/s2/favicons?sz=64&domain=' . urlencode($host);
+    $ctx  = stream_context_create(['http' => ['timeout' => 5, 'user_agent' => 'StartMe/1.0']]);
+    $data = @file_get_contents($google_url, false, $ctx);
+
+    if ($data && strlen($data) > 200) {
+        file_put_contents($filepath, $data);
+        return $fileurl;
+    }
+
+    // Fallback : URL Google directe
+    return $google_url;
 }
 
 function sanitize_url(string $url): string {

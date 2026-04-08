@@ -18,7 +18,29 @@ function session_start_secure(): void {
 
 function get_current_user_id(): ?int {
     session_start_secure();
-    return $_SESSION['user_id'] ?? null;
+    if (!empty($_SESSION['user_id'])) {
+        return (int)$_SESSION['user_id'];
+    }
+    // Tentative de reconnexion via le cookie remember_me
+    $token = $_COOKIE['remember_me'] ?? null;
+    if ($token && strlen($token) === 64) {
+        $hash = hash('sha256', $token);
+        $row  = db_fetch('SELECT user_id FROM remember_tokens WHERE token_hash = ?', [$hash]);
+        if ($row) {
+            $uid = (int)$row['user_id'];
+            login_user($uid);
+            // Renouveler le cookie à chaque visite (contourne le cap navigateur)
+            setcookie('remember_me', $token, [
+                'expires'  => time() + 10 * 365 * 24 * 3600,
+                'path'     => '/',
+                'secure'   => isset($_SERVER['HTTPS']),
+                'httponly' => true,
+                'samesite' => 'Lax',
+            ]);
+            return $uid;
+        }
+    }
+    return null;
 }
 
 function require_auth(): int {
@@ -36,8 +58,35 @@ function login_user(int $user_id): void {
     $_SESSION['user_id'] = $user_id;
 }
 
+function set_remember_token(int $user_id): void {
+    $token = bin2hex(random_bytes(32)); // 64 chars hex
+    $hash  = hash('sha256', $token);
+    db_insert('INSERT INTO remember_tokens (user_id, token_hash) VALUES (?, ?)', [$user_id, $hash]);
+    setcookie('remember_me', $token, [
+        'expires'  => time() + 10 * 365 * 24 * 3600, // 10 ans
+        'path'     => '/',
+        'secure'   => isset($_SERVER['HTTPS']),
+        'httponly' => true,
+        'samesite' => 'Lax',
+    ]);
+}
+
 function logout_user(): void {
     session_start_secure();
+    // Supprimer le token remember_me de la base
+    $token = $_COOKIE['remember_me'] ?? null;
+    if ($token && strlen($token) === 64) {
+        $hash = hash('sha256', $token);
+        db_query('DELETE FROM remember_tokens WHERE token_hash = ?', [$hash]);
+    }
+    // Effacer le cookie
+    setcookie('remember_me', '', [
+        'expires'  => time() - 3600,
+        'path'     => '/',
+        'secure'   => isset($_SERVER['HTTPS']),
+        'httponly' => true,
+        'samesite' => 'Lax',
+    ]);
     session_destroy();
 }
 

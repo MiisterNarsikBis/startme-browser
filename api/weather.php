@@ -7,13 +7,19 @@ require_once dirname(__DIR__) . '/includes/functions.php';
 $uid = require_auth();
 
 // GET /api/weather.php?widget_id=X&city=Paris
+// GET /api/weather.php?widget_id=X&lat=48.85&lon=2.35&name=Paris  (coordonnées directes, skip géocodage)
 $widget_id = (int)($_GET['widget_id'] ?? 0);
 $city      = trim($_GET['city'] ?? '');
-if (!$city) json_error('Ville requise.');
+$lat_in    = isset($_GET['lat']) ? (float)$_GET['lat'] : null;
+$lon_in    = isset($_GET['lon']) ? (float)$_GET['lon'] : null;
+$name_in   = trim($_GET['name'] ?? '');
+
+if (!$city && $lat_in === null) json_error('Ville ou coordonnées requises.');
 
 // --- Cache fichier ---
 if (!is_dir(CACHE_DIR)) mkdir(CACHE_DIR, 0755, true);
-$cache_file = CACHE_DIR . 'weather_' . $uid . '_' . ($widget_id ?: md5($city)) . '.json';
+$cache_key  = $lat_in !== null ? round($lat_in, 3) . '_' . round($lon_in, 3) : md5($city);
+$cache_file = CACHE_DIR . 'weather_' . $uid . '_' . ($widget_id ?: $cache_key) . '.json';
 
 if (file_exists($cache_file)) {
     $cached = json_decode(file_get_contents($cache_file), true);
@@ -24,7 +30,6 @@ if (file_exists($cache_file)) {
     }
 }
 
-// 1. Géocodage — Open-Meteo puis Nominatim (OSM) en fallback
 $ctx = stream_context_create(['http' => [
     'timeout'    => 8,
     'user_agent' => 'StartMe/1.0 (homepage perso)',
@@ -32,48 +37,56 @@ $ctx = stream_context_create(['http' => [
 
 $lat = $lon = $name = $country = $postal = $admin = null;
 
-// Détecter si c'est un code postal (4 à 10 chiffres)
-$is_postal = preg_match('/^\d{4,10}$/', trim($city))
-          || preg_match('/^[A-Z]{2}[\s\-]?\d{4,10}$/i', trim($city));
+// --- Coordonnées fournies directement (depuis l'autocomplétion) → skip géocodage ---
+if ($lat_in !== null && $lon_in !== null) {
+    $lat     = $lat_in;
+    $lon     = $lon_in;
+    $name    = $name_in ?: 'Localisation';
+    $country = '';
+    $admin   = '';
+} else {
+    // 1. Géocodage — Open-Meteo puis Nominatim (OSM) en fallback
+    $is_postal = preg_match('/^\d{4,10}$/', trim($city))
+              || preg_match('/^[A-Z]{2}[\s\-]?\d{4,10}$/i', trim($city));
 
-if (!$is_postal) {
-    // Open-Meteo fonctionne bien pour les noms de villes
-    $geo_url  = 'https://geocoding-api.open-meteo.com/v1/search?name=' . urlencode($city) . '&count=1&language=fr&format=json';
-    $geo_json = @file_get_contents($geo_url, false, $ctx);
-    if ($geo_json) {
-        $geo = json_decode($geo_json, true);
-        if (!empty($geo['results'][0])) {
-            $loc     = $geo['results'][0];
-            $lat     = $loc['latitude'];
-            $lon     = $loc['longitude'];
-            $name    = $loc['name'];
-            $country = $loc['country'] ?? '';
-            $admin   = $loc['admin1'] ?? ''; // région/département
+    if (!$is_postal) {
+        $geo_url  = 'https://geocoding-api.open-meteo.com/v1/search?name=' . urlencode($city) . '&count=1&language=fr&format=json';
+        $geo_json = @file_get_contents($geo_url, false, $ctx);
+        if ($geo_json) {
+            $geo = json_decode($geo_json, true);
+            if (!empty($geo['results'][0])) {
+                $loc     = $geo['results'][0];
+                $lat     = $loc['latitude'];
+                $lon     = $loc['longitude'];
+                $name    = $loc['name'];
+                $country = $loc['country'] ?? '';
+                $admin   = $loc['admin1'] ?? '';
+            }
         }
     }
+
+    // Fallback Nominatim (OpenStreetMap) — gère codes postaux ET noms
+    if ($lat === null) {
+        $nom_url  = 'https://nominatim.openstreetmap.org/search?q=' . urlencode($city)
+                  . '&format=json&limit=1&accept-language=fr&addressdetails=1';
+        $nom_json = @file_get_contents($nom_url, false, $ctx);
+        if (!$nom_json) json_error('Service de géocodage indisponible.');
+
+        $nom = json_decode($nom_json, true);
+        if (empty($nom[0])) json_error('Ville ou code postal introuvable : « ' . htmlspecialchars($city) . ' »');
+
+        $loc     = $nom[0];
+        $lat     = (float)$loc['lat'];
+        $lon     = (float)$loc['lon'];
+        $addr    = $loc['address'] ?? [];
+        $name    = $addr['city'] ?? $addr['town'] ?? $addr['village'] ?? $addr['municipality'] ?? $loc['display_name'];
+        $country = $addr['country'] ?? '';
+        $postal  = $addr['postcode'] ?? '';
+        $admin   = $addr['state'] ?? $addr['county'] ?? '';
+    }
+
+    if ($lat === null) json_error('Localisation introuvable.');
 }
-
-// Fallback Nominatim (OpenStreetMap) — gère codes postaux ET noms
-if ($lat === null) {
-    $nom_url  = 'https://nominatim.openstreetmap.org/search?q=' . urlencode($city)
-              . '&format=json&limit=1&accept-language=fr&addressdetails=1';
-    $nom_json = @file_get_contents($nom_url, false, $ctx);
-    if (!$nom_json) json_error('Service de géocodage indisponible.');
-
-    $nom = json_decode($nom_json, true);
-    if (empty($nom[0])) json_error('Ville ou code postal introuvable : « ' . htmlspecialchars($city) . ' »');
-
-    $loc     = $nom[0];
-    $lat     = (float)$loc['lat'];
-    $lon     = (float)$loc['lon'];
-    $addr    = $loc['address'] ?? [];
-    $name    = $addr['city'] ?? $addr['town'] ?? $addr['village'] ?? $addr['municipality'] ?? $loc['display_name'];
-    $country = $addr['country'] ?? '';
-    $postal  = $addr['postcode'] ?? '';
-    $admin   = $addr['state'] ?? $addr['county'] ?? '';
-}
-
-if ($lat === null) json_error('Localisation introuvable.');
 
 // 2. Météo
 $weather_url = sprintf(
