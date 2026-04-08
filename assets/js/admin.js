@@ -41,6 +41,7 @@ const adminApp = {
       clock:     { title: 'Horloge',   config: {},                                    w: 2, h: 16 },
       embed:     { title: 'Contenu',   config: { url: '' },                           w: 4, h: 40 },
       calendar:  { title: 'Calendrier',config: { ical_url: '' },                       w: 3, h: 24 },
+      image:     { title: 'Image',     config: { url: '', fit: 'cover', caption: '' }, w: 3, h: 30 },
     };
 
     const def = defaults[type] || { title: type, config: {}, w: 3, h: 4 };
@@ -58,7 +59,7 @@ const adminApp = {
       });
 
       // Ajouter visuellement dans la grille sans reload
-      const icons = { bookmarks:'🔖',rss:'📰',notes:'📝',todo:'✅',search:'🔍',weather:'🌤️',clock:'🕐',embed:'🖼️',calendar:'📅' };
+      const icons = { bookmarks:'🔖',rss:'📰',notes:'📝',todo:'✅',search:'🔍',weather:'🌤️',clock:'🕐',embed:'🖼️',calendar:'📅',image:'🖼️' };
 
       const content = `
         <div class="widget h-full flex flex-col rounded-2xl overflow-hidden relative"
@@ -228,6 +229,30 @@ const adminApp = {
               class="form-input w-full" placeholder="https://…/calendar.ics">
           </div>`;
         break;
+
+      case 'image':
+        html += `
+          <div class="flex flex-col gap-3">
+            <div>
+              <label class="text-sm text-white/60 block mb-1">URL de l'image</label>
+              <input id="wf-img-url" type="url" value="${escHtml(config.url||'')}"
+                class="form-input w-full" placeholder="https://…/photo.jpg">
+            </div>
+            <div>
+              <label class="text-sm text-white/60 block mb-1">Ajustement</label>
+              <select id="wf-img-fit" class="form-input w-full">
+                <option value="cover"   ${config.fit==='cover'   ?'selected':''}>Cover (recadré, remplit)</option>
+                <option value="contain" ${config.fit==='contain' ?'selected':''}>Contain (entier, avec marges)</option>
+                <option value="fill"    ${config.fit==='fill'    ?'selected':''}>Fill (étiré)</option>
+              </select>
+            </div>
+            <div>
+              <label class="text-sm text-white/60 block mb-1">Légende (optionnelle)</label>
+              <input id="wf-img-caption" type="text" value="${escHtml(config.caption||'')}"
+                class="form-input w-full" placeholder="Description de l'image…">
+            </div>
+          </div>`;
+        break;
     }
 
     return html;
@@ -342,6 +367,11 @@ const adminApp = {
         break;
       case 'calendar':
         config.ical_url = document.getElementById('wf-ical')?.value;
+        break;
+      case 'image':
+        config.url     = document.getElementById('wf-img-url')?.value;
+        config.fit     = document.getElementById('wf-img-fit')?.value;
+        config.caption = document.getElementById('wf-img-caption')?.value;
         break;
     }
 

@@ -141,7 +141,7 @@ tailwind.config = {
             $type = $w['type'];
             $config = json_decode($w['config_json'] ?? '{}', true) ?? [];
             echo '<div class="flex items-center justify-center h-full text-white/30 flex-col gap-2">';
-            $icons = ['bookmarks'=>'🔖','rss'=>'📰','notes'=>'📝','todo'=>'✅','search'=>'🔍','weather'=>'🌤️','clock'=>'🕐','embed'=>'🖼️','calendar'=>'📅'];
+            $icons = ['bookmarks'=>'🔖','rss'=>'📰','notes'=>'📝','todo'=>'✅','search'=>'🔍','weather'=>'🌤️','clock'=>'🕐','embed'=>'🖼️','calendar'=>'📅','image'=>'🌄'];
             echo '<span class="text-4xl">' . ($icons[$type] ?? '📦') . '</span>';
             echo '<span class="text-sm">' . ucfirst($type) . '</span>';
             if ($type === 'weather' && !empty($config['city'])) echo '<span class="text-xs opacity-60">' . htmlspecialchars($config['city']) . '</span>';
@@ -180,6 +180,7 @@ tailwind.config = {
           'clock'     => ['🕐', 'Horloge'],
           'embed'     => ['🖼️', 'Embed'],
           'calendar'  => ['📅', 'Calendrier'],
+          'image'     => ['🌄', 'Image'],
         ];
         foreach ($widgetTypes as $type => [$icon, $label]):
         ?>

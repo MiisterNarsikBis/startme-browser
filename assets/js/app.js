@@ -45,6 +45,9 @@ function initGrid(editMode) {
     updateClock(el);
     setInterval(() => updateClock(el), 1000);
   });
+
+  // Drag & drop bookmarks
+  initBookmarksSortable();
 }
 
 // ----------------------------------------------------------------
@@ -357,6 +360,26 @@ async function deleteTodo(id, label) {
 async function deleteBookmark(id, el) {
   await apiFetch(`/api/bookmarks.php?action=delete&id=${id}`, {});
   el.remove();
+}
+
+// ----------------------------------------------------------------
+// Drag & drop bookmarks (SortableJS)
+// ----------------------------------------------------------------
+function initBookmarksSortable() {
+  document.querySelectorAll('.bookmarks-list').forEach(list => {
+    Sortable.create(list, {
+      animation:   150,
+      handle:      '.bm-handle',     // poignée visible au survol (mode liste)
+      fallbackOnBody: true,
+      ghostClass:  'opacity-20',
+      chosenClass: 'opacity-60',
+      onEnd: async () => {
+        const widgetId = parseInt(list.dataset.widgetId);
+        const order    = [...list.children].map(el => parseInt(el.dataset.id)).filter(Boolean);
+        await apiFetch('/api/bookmarks.php?action=reorder', { widget_id: widgetId, order });
+      },
+    });
+  });
 }
 
 // ----------------------------------------------------------------

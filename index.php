@@ -63,6 +63,9 @@ tailwind.config = {
 <script defer src="https://cdn.jsdelivr.net/npm/alpinejs@3/dist/cdn.min.js"></script>
 
 <link rel="stylesheet" href="<?= BASE_URL ?>/assets/css/app.css">
+<?php if ($page['bg_type'] === 'image' && !empty($page['bg_value'])): ?>
+<link rel="preload" as="image" href="<?= htmlspecialchars($page['bg_value']) ?>">
+<?php endif; ?>
 </head>
 <body class="min-h-screen text-white overflow-x-hidden"
   style="<?= bg_style($page) ?>; font-family: 'Inter', sans-serif;">
@@ -180,6 +183,7 @@ function renderWidget(array $w): void {
         'clock'     => renderClock(),
         'embed'     => renderEmbed($config),
         'calendar'  => renderCalendar($config),
+        'image'     => renderImage($config),
         default     => null,
     };
 
@@ -208,7 +212,8 @@ function renderBookmarks(int $id, array $config): void {
         $title   = htmlspecialchars($bm['title']);
         $url     = htmlspecialchars($bm['url']);
         if ($display === 'list') {
-            echo '<div class="relative group/bm flex items-center">
+            echo '<div class="relative group/bm flex items-center" data-id="' . $bmId . '">
+                   <span class="bm-handle px-1 opacity-0 group-hover/bm:opacity-30 hover:!opacity-70 cursor-grab text-white text-xs select-none">⠿</span>
                    <a href="' . $url . '" target="_blank"
                       class="flex-1 flex items-center gap-2.5 px-2 py-1.5 pr-7 rounded-lg hover:bg-white/10 transition">
                      <img src="' . $favicon . '" class="w-4 h-4 rounded flex-shrink-0" onerror="this.src=\'data:image/svg+xml,<svg xmlns=&quot;http://www.w3.org/2000/svg&quot; viewBox=&quot;0 0 24 24&quot;><circle cx=&quot;12&quot; cy=&quot;12&quot; r=&quot;10&quot; fill=&quot;%236366f1&quot;/></svg>\'">
@@ -218,7 +223,7 @@ function renderBookmarks(int $id, array $config): void {
                      class="absolute right-1.5 opacity-0 group-hover/bm:opacity-100 text-white/30 hover:text-red-400 transition-opacity text-xs leading-none p-0.5">✕</button>
                  </div>';
         } else {
-            echo '<div class="relative group/bm">
+            echo '<div class="relative group/bm" data-id="' . $bmId . '">
                    <a href="' . $url . '" target="_blank"
                       class="flex flex-col items-center gap-1.5 p-2 rounded-xl hover:bg-white/10 transition group text-center w-full">
                      <img src="' . $favicon . '" class="w-8 h-8 rounded-lg" onerror="this.src=\'data:image/svg+xml,<svg xmlns=&quot;http://www.w3.org/2000/svg&quot; viewBox=&quot;0 0 24 24&quot;><circle cx=&quot;12&quot; cy=&quot;12&quot; r=&quot;10&quot; fill=&quot;%236366f1&quot;/></svg>\'">
@@ -362,6 +367,24 @@ function renderCalendar(array $config): void {
     echo '<div class="text-center py-4">
             <p class="text-5xl mb-2">' . date('d') . '</p>
             <p class="text-white/60 text-sm">' . strftime_fr() . '</p>
+          </div>';
+}
+
+function renderImage(array $config): void {
+    $url     = htmlspecialchars($config['url'] ?? '');
+    $fit     = $config['fit'] ?? 'cover'; // cover | contain | fill
+    $caption = htmlspecialchars($config['caption'] ?? '');
+    if (!$url) {
+        echo '<p class="text-white/40 text-sm text-center py-4">Configurez une image dans les paramètres du widget.</p>';
+        return;
+    }
+    echo '<div class="relative w-full h-full overflow-hidden rounded-lg">
+            <img src="' . $url . '" alt="' . $caption . '"
+                 class="w-full h-full"
+                 style="object-fit:' . htmlspecialchars($fit) . '"
+                 loading="lazy">
+            ' . ($caption ? '<div class="absolute bottom-0 left-0 right-0 px-3 py-2 text-xs text-white/80"
+                 style="background:linear-gradient(transparent,rgba(0,0,0,0.6))">' . $caption . '</div>' : '') . '
           </div>';
 }
 
