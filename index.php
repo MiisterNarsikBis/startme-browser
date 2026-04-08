@@ -337,8 +337,7 @@ function renderWeather(int $id, array $config): void {
     }
     echo '<div class="weather-container h-full" data-widget-id="' . $id . '" data-city="' . $city . '">
               <div class="text-white/30 text-sm py-4 text-center">⏳ Chargement météo…</div>
-            </div>
-          </div>';
+            </div>';
 }
 
 function renderClock(): void {
