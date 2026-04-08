@@ -98,7 +98,7 @@ if (!$weather_json) json_error('Données météo indisponibles.');
 $weather = json_decode($weather_json, true);
 
 $wmo = [
-    0  => ['Ciel dégagé',         '🌞'],
+    0  => ['Ciel dégagé',         '☀'],
     1  => ['Peu nuageux',          '🌤'],
     2  => ['Partiellement nuageux','⛅'],
     3  => ['Couvert',              '☁'],

@@ -91,6 +91,9 @@ async function loadRssFeed(container, widgetId, url) {
       null, 'GET'
     );
 
+    // Ignorer si l'onglet a changé pendant le chargement
+    if (container.dataset.currentUrl !== url) return;
+
     const items = data.items ?? data;
     const cachedAt = data.cached_at ?? null;
 
