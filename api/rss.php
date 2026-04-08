@@ -38,7 +38,7 @@ $cache = db_fetch(
 
 if ($cache && strtotime($cache['fetched_at']) > time() - (RSS_CACHE_MINUTES * 60)) {
     $items = json_decode($cache['content_json'], true) ?? [];
-    json_response(array_slice($items, 0, $max_items));
+    json_response(['items' => array_slice($items, 0, $max_items), 'cached_at' => $cache['fetched_at']]);
 }
 
 // Fetch du flux
@@ -114,7 +114,7 @@ db_query(
     [$widget_id, $feed_url, $json, $json]
 );
 
-json_response(array_slice($items, 0, $max_items));
+json_response(['items' => array_slice($items, 0, $max_items), 'cached_at' => date('Y-m-d H:i:s')]);
 
 // --- Helper ---
 function get_widget_feeds(array $config): array {

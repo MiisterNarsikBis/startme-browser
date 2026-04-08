@@ -86,10 +86,27 @@ async function loadRssFeed(container, widgetId, url) {
     </svg> Chargement…</div>`;
 
   try {
-    const items = await apiFetch(
+    const data = await apiFetch(
       `/api/rss.php?widget_id=${widgetId}&url=${encodeURIComponent(url)}`,
       null, 'GET'
     );
+
+    const items = data.items ?? data;
+    const cachedAt = data.cached_at ?? null;
+
+    // Afficher la date de cache discrètement (top-right du bloc RSS)
+    const cacheLabel = container.closest('.relative')?.querySelector(`.rss-cached-at[data-widget-id="${widgetId}"]`);
+    if (cacheLabel && cachedAt) {
+      const d = new Date(cachedAt.replace(' ', 'T'));
+      const diffMin = Math.round((Date.now() - d) / 60000);
+      let label;
+      if (diffMin < 1)        label = 'à l\'instant';
+      else if (diffMin < 60)  label = `il y a ${diffMin} min`;
+      else if (diffMin < 1440) label = `il y a ${Math.round(diffMin / 60)}h`;
+      else                    label = d.toLocaleDateString('fr-FR', { day: 'numeric', month: 'short' });
+      cacheLabel.textContent = label;
+      cacheLabel.title = cachedAt;
+    }
 
     if (!items.length) {
       container.innerHTML = '<p class="text-white/30 text-sm py-4 text-center">Aucun article disponible.</p>';

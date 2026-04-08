@@ -275,6 +275,8 @@ function renderRss(int $id, array $config): void {
 
     $firstUrl = htmlspecialchars($feeds[0]['url'], ENT_QUOTES);
 
+    echo '<div class="relative">';
+    echo '<span class="rss-cached-at absolute top-0 right-0 text-[10px] text-white/20 tabular-nums pointer-events-none z-10" data-widget-id="' . $id . '"></span>';
     echo $tabs;
     echo '<div class="rss-feed-container overflow-auto" data-widget-id="' . $id . '" data-feeds="' . $feedsJson . '" data-current-url="' . $firstUrl . '">
             <div class="flex items-center gap-2 text-white/30 text-sm py-4">
@@ -285,6 +287,7 @@ function renderRss(int $id, array $config): void {
               Chargement…
             </div>
           </div>';
+    echo '</div>';
 }
 
 function renderNotes(int $id): void {
