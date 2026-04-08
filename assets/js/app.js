@@ -76,18 +76,7 @@ async function loadRss(widgetId) {
     return;
   }
 
-  // Charger l'onglet actif en priorité (affiché immédiatement)
   await loadRssFeed(container, widgetId, url);
-
-  // Pré-charger les autres flux en arrière-plan pour réchauffer le cache
-  try {
-    const feeds = JSON.parse(container.dataset.feeds || '[]');
-    feeds.forEach(f => {
-      if (f.url !== url) {
-        apiFetch(`/api/v1/rss?widget_id=${widgetId}&url=${encodeURIComponent(f.url)}`, null, 'GET').catch(() => {});
-      }
-    });
-  } catch (_) {}
 }
 
 async function loadRssFeed(container, widgetId, url) {
