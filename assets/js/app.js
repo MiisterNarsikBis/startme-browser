@@ -535,14 +535,13 @@ function initPomodoro(widgetId, cfg) {
 
       state    = s.state    || 'work';
       sessions = s.sessions || 0;
-      running  = false; // on reprend toujours en pause, on recalcule d'abord
 
-      // Recalculer le temps écoulé si le timer tournait quand on est partis
       if (s.running && s.savedAt) {
+        // Timer tournait → recalculer le temps écoulé
         const elapsed = Math.floor((Date.now() - s.savedAt) / 1000);
         remaining = Math.max(0, (s.remaining || workMin) - elapsed);
         if (remaining <= 0) {
-          // La phase s'est terminée pendant l'absence → passer à la suivante (arrêtée)
+          // Phase terminée pendant l'absence → passer à la suivante (en pause)
           if (state === 'work') {
             sessions++;
             state = sessions % longBreakEvery === 0 ? 'long-break' : 'short-break';
@@ -550,10 +549,21 @@ function initPomodoro(widgetId, cfg) {
             state = 'work';
           }
           remaining = durations()[state];
+          running = false;
           showToast(modeLabels()[state] + ' (terminé pendant ton absence)', 'info');
+        } else {
+          // Phase encore en cours → reprendre automatiquement
+          running = true;
+          interval = setInterval(() => {
+            if (remaining <= 0) { nextPhase(); return; }
+            remaining--;
+            render();
+            saveState();
+          }, 1000);
         }
       } else {
         remaining = s.remaining ?? durations()[state];
+        running   = false;
       }
     } catch {}
   }
