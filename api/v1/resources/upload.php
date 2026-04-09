@@ -1,6 +1,7 @@
 <?php
-/* GET  /api/v1/upload          → liste les images uploadées par l'utilisateur
-   POST /api/v1/upload?page_id=X  multipart/form-data, champ : "bg" */
+/* GET    /api/v1/upload              → liste les images uploadées par l'utilisateur
+   POST   /api/v1/upload?page_id=X   multipart/form-data, champ : "bg"
+   DELETE /api/v1/upload?file=name   → supprime une image de l'utilisateur */
 
 // GET — liste des images uploadées
 if ($method === 'GET') {
@@ -17,6 +18,17 @@ if ($method === 'GET') {
         usort($files, fn($a, $b) => $b['time'] - $a['time']);
     }
     json_response($files);
+}
+
+// DELETE — supprimer une image
+if ($method === 'DELETE') {
+    $name = basename($_GET['file'] ?? '');
+    // Vérifier que le fichier appartient bien à cet utilisateur
+    if (!preg_match('/^bg_' . $uid . '_/', $name)) json_error('Accès refusé.', 403);
+    $path = UPLOAD_DIR . $name;
+    if (!file_exists($path)) json_error('Fichier introuvable.', 404);
+    unlink($path);
+    json_response(['ok' => true]);
 }
 
 if ($method !== 'POST') json_error('Méthode invalide.', 405);
@@ -45,6 +57,19 @@ $ext = match($mime) {
     'image/avif' => 'avif',
     default      => 'jpg',
 };
+
+// Déduplication par hash MD5 : si le même fichier a déjà été uploadé, retourner l'URL existante
+$hash = md5_file($file['tmp_name']);
+if (is_dir(UPLOAD_DIR)) {
+    foreach (glob(UPLOAD_DIR . 'bg_' . $uid . '_*.{jpg,jpeg,png,webp,gif,avif}', GLOB_BRACE) as $existing) {
+        if (md5_file($existing) === $hash) {
+            $existingUrl = UPLOAD_URL . basename($existing);
+            db_query('UPDATE pages SET bg_type=?, bg_value=? WHERE id=?', ['image', $existingUrl, $page_id]);
+            json_response(['ok' => true, 'url' => $existingUrl, 'dedup' => true]);
+        }
+    }
+}
+
 $filename = 'bg_' . $uid . '_' . $page_id . '_' . time() . '.' . $ext;
 $dest     = UPLOAD_DIR . $filename;
 
