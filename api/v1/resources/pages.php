@@ -47,6 +47,9 @@ if ($method === 'PUT' && $id !== null) {
         $fields[] = 'bg_type=?'; $params[] = $d['bg_type'];
         $fields[] = 'bg_value=?'; $params[] = $d['bg_value'] ?? '#0f172a';
     }
+    if (isset($d['accent_color']) && preg_match('/^#[0-9a-fA-F]{6}$/', $d['accent_color'])) {
+        $fields[] = 'accent_color=?'; $params[] = $d['accent_color'];
+    }
     if ($fields) { $params[] = $id; db_query('UPDATE pages SET '.implode(',',$fields).' WHERE id=?', $params); }
     json_response(['ok' => true]);
 }

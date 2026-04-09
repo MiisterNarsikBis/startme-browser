@@ -43,12 +43,26 @@ tailwind.config = {
   darkMode: 'class',
   theme: {
     extend: {
-      colors: { brand: { DEFAULT: '#6366f1', dark: '#4f46e5' } },
+      colors: {
+        brand: {
+          DEFAULT: 'rgb(var(--brand) / <alpha-value>)',
+          dark:    'rgb(var(--brand-dark) / <alpha-value>)',
+        }
+      },
       fontFamily: { mono: ['JetBrains Mono','monospace'] }
     }
   }
 }
 </script>
+<?php
+$accent  = $page['accent_color'] ?? '#6366f1';
+$accent  = preg_match('/^#[0-9a-fA-F]{6}$/', $accent) ? $accent : '#6366f1';
+$r       = hexdec(substr($accent, 1, 2));
+$g       = hexdec(substr($accent, 3, 2));
+$b       = hexdec(substr($accent, 5, 2));
+$rDark   = (int)($r * 0.8); $gDark = (int)($g * 0.8); $bDark = (int)($b * 0.8);
+?>
+<style>:root { --brand: <?= "$r $g $b" ?>; --brand-dark: <?= "$rDark $gDark $bDark" ?>; }</style>
 
 <!-- Fonts -->
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">

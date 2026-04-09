@@ -19,6 +19,7 @@ const adminApp = {
     const panel = document.getElementById('modal-' + name);
     if (panel) panel.classList.remove('hidden');
     if (name === 'themes') this.renderThemes();
+    if (name === 'page-settings') this.initPageSettingsForm();
   },
 
   closeModal(e) {
@@ -529,9 +530,16 @@ const adminApp = {
     await apiFetch(`/api/v1/widgets/${id}`, { title, config }, 'PUT');
     showToast('Widget mis à jour');
 
-    // Mettre à jour le titre dans la grille
+    // Mettre à jour le DOM : titre + data-widget-config (évite la perte au 2e edit sans rechargement)
     const header = document.querySelector(`[data-widget-id="${id}"] .widget-header .font-semibold`);
     if (header) header.textContent = title;
+
+    const editBtn = document.querySelector(`button[data-widget-id="${id}"]`);
+    if (editBtn) {
+      editBtn.dataset.widgetConfig = JSON.stringify(config);
+      editBtn.dataset.widgetTitle  = title;
+      this.currentWidgetConfig     = config;
+    }
 
     this.closeModal({target: document.getElementById('modal-overlay')});
   },
@@ -548,6 +556,83 @@ const adminApp = {
   // ----------------------------------------------------------
   // PAGE — Paramètres
   // ----------------------------------------------------------
+
+  // Initialise le formulaire avec les valeurs actuelles de la page
+  initPageSettingsForm() {
+    const type  = typeof PAGE_BG !== 'undefined' ? PAGE_BG.type  : 'color';
+    const value = typeof PAGE_BG !== 'undefined' ? PAGE_BG.value : '#0f172a';
+    const accent = typeof PAGE_ACCENT !== 'undefined' ? PAGE_ACCENT : '#6366f1';
+
+    // Onglet bg
+    this.setBgTab(type);
+
+    // Remplir la valeur actuelle
+    if (type === 'color') {
+      const el = document.getElementById('pg-bg-color');
+      if (el) el.value = value;
+    } else if (type === 'gradient') {
+      const sel = document.getElementById('pg-bg-gradient');
+      if (sel) {
+        // Chercher l'option correspondante, sinon garder la première
+        const opt = Array.from(sel.options).find(o => o.value === value);
+        if (opt) sel.value = value;
+        document.getElementById('gradient-preview').style.background = value;
+      }
+    } else if (type === 'image') {
+      const urlEl = document.getElementById('pg-bg-url');
+      if (urlEl && value) {
+        urlEl.value = value;
+        this.previewBgUrl(value);
+      }
+      // Charger la galerie
+      this.loadBgGallery();
+    }
+
+    // Couleur d'accent
+    const accentEl = document.getElementById('pg-accent');
+    if (accentEl) accentEl.value = accent;
+  },
+
+  _bgGalleryLoaded: false,
+
+  async loadBgGallery() {
+    if (this._bgGalleryLoaded) return;
+    const gallery = document.getElementById('bg-gallery');
+    const grid    = document.getElementById('bg-gallery-grid');
+    if (!gallery || !grid) return;
+
+    try {
+      const files = await apiFetch('/api/v1/upload', null, 'GET');
+      if (!files || !files.length) return;
+
+      gallery.classList.remove('hidden');
+      grid.innerHTML = files.map(f => `
+        <button type="button" onclick="adminApp.selectGalleryImg('${escHtml(f.url)}')"
+          class="relative h-16 rounded-lg overflow-hidden border-2 border-white/10 hover:border-brand/60 transition bg-cover bg-center"
+          style="background-image:url('${escHtml(f.url)}')" title="${escHtml(f.name)}">
+        </button>`).join('');
+      this._bgGalleryLoaded = true;
+    } catch {}
+  },
+
+  selectGalleryImg(url) {
+    const urlEl = document.getElementById('pg-bg-url');
+    if (urlEl) { urlEl.value = url; this.previewBgUrl(url); }
+  },
+
+  previewAccent(hex) {
+    if (!/^#[0-9a-fA-F]{6}$/.test(hex)) return;
+    const r = parseInt(hex.slice(1,3),16), g = parseInt(hex.slice(3,5),16), b = parseInt(hex.slice(5,7),16);
+    document.documentElement.style.setProperty('--brand', `${r} ${g} ${b}`);
+    document.documentElement.style.setProperty('--brand-dark', `${Math.floor(r*.8)} ${Math.floor(g*.8)} ${Math.floor(b*.8)}`);
+  },
+
+  pickAccent(hex) {
+    const el = document.getElementById('pg-accent');
+    if (el) el.value = hex;
+    this.previewAccent(hex);
+  },
+
   setBgTab(tab) {
     this.bgTab = tab;
     ['color','gradient','image'].forEach(t => {
@@ -569,6 +654,9 @@ const adminApp = {
         document.getElementById('gradient-preview').style.background = sel.value;
       });
     }
+
+    // Charger galerie au premier passage sur image
+    if (tab === 'image') this.loadBgGallery();
   },
 
   previewBgUrl(url) {
@@ -594,6 +682,9 @@ const adminApp = {
     if (data.url) {
       document.getElementById('pg-bg-url').value = data.url;
       this.previewBgUrl(data.url);
+      // Recharger la galerie avec la nouvelle image
+      this._bgGalleryLoaded = false;
+      this.loadBgGallery();
     } else {
       alert('Erreur upload : ' + (data.error || 'inconnue'));
     }
@@ -620,14 +711,22 @@ const adminApp = {
         break;
     }
 
+    const accentColor = document.getElementById('pg-accent')?.value || '#6366f1';
+
     await apiFetch(`/api/v1/pages/${pageId}`, {
-      name, icon, bg_type: bgType, bg_value: bgValue,
+      name, icon, bg_type: bgType, bg_value: bgValue, accent_color: accentColor,
     }, 'PUT');
+
+    // Mettre à jour PAGE_BG et PAGE_ACCENT en mémoire
+    if (typeof PAGE_BG !== 'undefined') { PAGE_BG.type = bgType; PAGE_BG.value = bgValue; }
 
     // Appliquer le fond sans reload
     document.body.style.background = bgType === 'image'
       ? `url(${bgValue}) center/cover no-repeat fixed`
       : bgValue;
+
+    // Appliquer accent sans reload
+    this.previewAccent(accentColor);
 
     showToast('Page sauvegardée');
     this.closeModal({target: document.getElementById('modal-overlay')});
