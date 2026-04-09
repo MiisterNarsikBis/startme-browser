@@ -189,6 +189,8 @@ function renderWidget(array $w): void {
         'embed'     => renderEmbed($config),
         'calendar'  => renderCalendar($config),
         'image'     => renderImage($config),
+        'pomodoro'  => renderPomodoro($id, $config),
+        'github'    => renderGithub($id, $config),
         default     => null,
     };
 
@@ -375,6 +377,60 @@ function renderCalendar(array $config): void {
     echo '<div class="text-center py-4">
             <p class="text-5xl mb-2">' . date('d') . '</p>
             <p class="text-white/60 text-sm">' . strftime_fr() . '</p>
+          </div>';
+}
+
+function renderPomodoro(int $id, array $config): void {
+    $work  = (int)($config['work_minutes']       ?? 25);
+    $short = (int)($config['break_minutes']      ?? 5);
+    $long  = (int)($config['long_break_minutes'] ?? 15);
+    $every = (int)($config['long_break_every']   ?? 4);
+    $cfg   = htmlspecialchars(json_encode([
+        'work_minutes'       => $work,
+        'break_minutes'      => $short,
+        'long_break_minutes' => $long,
+        'long_break_every'   => $every,
+    ], JSON_UNESCAPED_UNICODE), ENT_QUOTES);
+
+    echo '<div class="flex flex-col items-center justify-center h-full gap-3 select-none"
+               data-pomodoro-config="' . $cfg . '">
+            <div class="pomo-mode text-xs text-white/50 font-medium tracking-wide">🍅 Travail</div>
+            <div class="pomo-display text-5xl font-mono font-bold tabular-nums" style="color:#f87171">'
+               . sprintf('%02d:00', $work) .
+            '</div>
+            <div class="pomo-sessions flex gap-1.5 h-3"></div>
+            <div class="flex items-center gap-2 mt-1">
+              <button class="pomo-toggle w-10 h-10 rounded-full bg-white/10 hover:bg-brand/40 transition
+                             text-lg flex items-center justify-center">▶</button>
+              <button class="pomo-skip w-8 h-8 rounded-full bg-white/5 hover:bg-white/15 transition
+                             text-sm flex items-center justify-center" title="Passer la phase">⏭</button>
+              <button class="pomo-reset w-8 h-8 rounded-full bg-white/5 hover:bg-white/15 transition
+                             text-sm flex items-center justify-center" title="Réinitialiser">↺</button>
+            </div>
+            <div class="text-xs text-white/25 mt-1">' . $work . 'min / ' . $short . 'min / ' . $long . 'min</div>
+          </div>';
+}
+
+function renderGithub(int $id, array $config): void {
+    $username = htmlspecialchars($config['username'] ?? '', ENT_QUOTES);
+    $platform = htmlspecialchars($config['platform'] ?? 'github', ENT_QUOTES);
+    $cfg = htmlspecialchars(json_encode([
+        'username' => $config['username'] ?? '',
+        'platform' => $config['platform'] ?? 'github',
+    ], JSON_UNESCAPED_UNICODE), ENT_QUOTES);
+
+    if (!($config['username'] ?? '')) {
+        echo '<p class="text-white/30 text-sm text-center py-6">Configurez un nom d\'utilisateur dans les paramètres.</p>';
+        return;
+    }
+    echo '<div class="github-container h-full overflow-auto" data-github-config="' . $cfg . '">
+            <div class="flex items-center gap-2 text-white/30 text-sm py-4 justify-center">
+              <svg class="animate-spin w-4 h-4" fill="none" viewBox="0 0 24 24">
+                <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"/>
+                <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8z"/>
+              </svg>
+              Chargement…
+            </div>
           </div>';
 }
 

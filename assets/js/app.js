@@ -46,6 +46,20 @@ function initGrid(editMode) {
     setInterval(() => updateClock(el), 1000);
   });
 
+  // Pomodoro
+  document.querySelectorAll('[data-widget-type="pomodoro"]').forEach(el => {
+    const wid = el.dataset.widgetId;
+    const cfg = JSON.parse(el.querySelector('[data-pomodoro-config]')?.dataset.pomodoroConfig || '{}');
+    initPomodoro(wid, cfg);
+  });
+
+  // GitHub / GitLab
+  document.querySelectorAll('[data-widget-type="github"]').forEach(el => {
+    const wid = el.dataset.widgetId;
+    const cfg = JSON.parse(el.querySelector('[data-github-config]')?.dataset.githubConfig || '{}');
+    initGithubWidget(wid, cfg);
+  });
+
   // Drag & drop bookmarks
   initBookmarksSortable();
 }
@@ -60,6 +74,7 @@ async function saveGridLayout() {
   }));
 
   await apiFetch('/api/v1/widgets/reorder', { items });
+  showToast('Disposition sauvegardée');
 }
 
 // ----------------------------------------------------------------
@@ -184,25 +199,29 @@ function setupWeatherAutocomplete(widgetId) {
   if (input.dataset.acReady) return;
   input.dataset.acReady = '1';
 
+  const ac = new AbortController();
+  // Stocker l'AbortController pour pouvoir nettoyer les listeners plus tard
+  input._acController = ac;
+
   let timer;
   input.addEventListener('input', () => {
     clearTimeout(timer);
     const q = input.value.trim();
     if (q.length < 2) { closeWeatherDropdown(widgetId); return; }
     timer = setTimeout(() => fetchWeatherSuggestions(widgetId, q), 300);
-  });
+  }, { signal: ac.signal });
 
   input.addEventListener('keydown', e => {
     if (e.key === 'Escape') {
       closeWeatherDropdown(widgetId);
       document.getElementById(`weather-form-${widgetId}`).classList.add('hidden');
     }
-  });
+  }, { signal: ac.signal });
 
   document.addEventListener('click', e => {
     const form = document.getElementById(`weather-form-${widgetId}`);
     if (form && !form.contains(e.target)) closeWeatherDropdown(widgetId);
-  }, { passive: true });
+  }, { passive: true, signal: ac.signal });
 }
 
 async function fetchWeatherSuggestions(widgetId, query) {
@@ -282,7 +301,7 @@ async function loadWeather(widgetId, city = null, lat = null, lon = null, name =
     const d = await apiFetch(url, null, 'GET');
 
     const forecastHtml = d.forecast.map((day, i) => {
-      const label = i === 0 ? 'Auj.' : new Date(day.date + 'T12:00:00').toLocaleDateString('fr-FR', { weekday: 'short' });
+      const label = i === 0 ? 'Auj.' : new Date(day.date + 'T12:00:00Z').toLocaleDateString('fr-FR', { weekday: 'short' });
       return `<div class="forecast-day">
         <div>${escHtml(day.emoji)}</div>
         <div class="font-medium text-white/80">${day.max}°</div>
@@ -348,6 +367,7 @@ function debounceSaveNote(widgetId, content) {
 
 async function saveNote(widgetId, content) {
   await apiFetch('/api/v1/notes', { widget_id: widgetId, content });
+  showToast('Note sauvegardée');
 }
 
 // ----------------------------------------------------------------
@@ -445,6 +465,247 @@ function toggleTheme() {
 
 // Appliquer immédiatement au chargement (avant initGrid)
 applyTheme(localStorage.getItem('theme') || 'dark');
+
+// ----------------------------------------------------------------
+// Toast
+// ----------------------------------------------------------------
+function showToast(message, type = 'success') {
+  const colors = {
+    success: 'bg-green-500/90 text-white',
+    error:   'bg-red-500/90 text-white',
+    info:    'bg-white/20 backdrop-blur-sm text-white',
+  };
+  const toast = document.createElement('div');
+  toast.className = `fixed bottom-5 right-5 z-[300] px-4 py-2.5 rounded-xl text-sm font-medium
+    shadow-xl pointer-events-none transition-all duration-300 ${colors[type] || colors.success}`;
+  toast.style.cssText = 'transform:translateY(8px);opacity:0';
+  toast.textContent = message;
+  document.body.appendChild(toast);
+
+  requestAnimationFrame(() => {
+    toast.style.transform = 'translateY(0)';
+    toast.style.opacity   = '1';
+  });
+  setTimeout(() => {
+    toast.style.transform = 'translateY(8px)';
+    toast.style.opacity   = '0';
+    setTimeout(() => toast.remove(), 300);
+  }, 2200);
+}
+
+// ----------------------------------------------------------------
+// Pomodoro
+// ----------------------------------------------------------------
+function initPomodoro(widgetId, cfg) {
+  const workMin      = (cfg.work_minutes       || 25) * 60;
+  const shortBreakMin = (cfg.break_minutes      || 5)  * 60;
+  const longBreakMin  = (cfg.long_break_minutes || 15) * 60;
+  const longBreakEvery = cfg.long_break_every   || 4;
+
+  const root     = document.querySelector(`[data-widget-id="${widgetId}"]`);
+  const display  = root?.querySelector('.pomo-display');
+  const modeEl   = root?.querySelector('.pomo-mode');
+  const sessEl   = root?.querySelector('.pomo-sessions');
+  const btnToggle = root?.querySelector('.pomo-toggle');
+  if (!display || !btnToggle) return;
+
+  let state    = 'work';   // 'work' | 'short-break' | 'long-break'
+  let sessions = 0;
+  let remaining = workMin;
+  let running  = false;
+  let interval = null;
+
+  function durations() {
+    return { work: workMin, 'short-break': shortBreakMin, 'long-break': longBreakMin };
+  }
+
+  function modeLabels() {
+    return { work: '🍅 Travail', 'short-break': '☕ Pause courte', 'long-break': '🛋️ Pause longue' };
+  }
+
+  function render() {
+    const m = Math.floor(remaining / 60).toString().padStart(2, '0');
+    const s = (remaining % 60).toString().padStart(2, '0');
+    display.textContent = `${m}:${s}`;
+    modeEl.textContent  = modeLabels()[state];
+
+    // Points de sessions (○●)
+    const dots = Array.from({ length: longBreakEvery }, (_, i) =>
+      i < (sessions % longBreakEvery)
+        ? '<span class="inline-block w-2.5 h-2.5 rounded-full bg-brand"></span>'
+        : '<span class="inline-block w-2.5 h-2.5 rounded-full bg-white/20"></span>'
+    ).join('');
+    sessEl.innerHTML = dots;
+
+    btnToggle.textContent = running ? '⏸' : '▶';
+    display.style.color = state === 'work' ? '#f87171' :
+                          state === 'short-break' ? '#34d399' : '#60a5fa';
+  }
+
+  function nextPhase() {
+    clearInterval(interval);
+    running = false;
+    if (state === 'work') {
+      sessions++;
+      state = sessions % longBreakEvery === 0 ? 'long-break' : 'short-break';
+    } else {
+      state = 'work';
+    }
+    remaining = durations()[state];
+    render();
+    showToast(modeLabels()[state] + ' !', 'info');
+  }
+
+  btnToggle.addEventListener('click', () => {
+    if (running) {
+      clearInterval(interval);
+      running = false;
+    } else {
+      running = true;
+      interval = setInterval(() => {
+        if (remaining <= 0) { nextPhase(); return; }
+        remaining--;
+        render();
+      }, 1000);
+    }
+    render();
+  });
+
+  root.querySelector('.pomo-skip')?.addEventListener('click', nextPhase);
+  root.querySelector('.pomo-reset')?.addEventListener('click', () => {
+    clearInterval(interval);
+    running   = false;
+    state     = 'work';
+    sessions  = 0;
+    remaining = workMin;
+    render();
+  });
+
+  render();
+}
+
+// ----------------------------------------------------------------
+// GitHub / GitLab
+// ----------------------------------------------------------------
+async function initGithubWidget(widgetId, cfg) {
+  const username = (cfg.username || '').trim();
+  const platform = cfg.platform || 'github';
+  const root     = document.querySelector(`[data-widget-id="${widgetId}"][data-widget-type="github"]`);
+  const container = root?.querySelector('.github-container');
+  if (!container || !username) {
+    if (container) container.innerHTML = '<p class="text-white/30 text-sm text-center py-6">Configurez un nom d\'utilisateur.</p>';
+    return;
+  }
+
+  try {
+    if (platform === 'gitlab') {
+      await loadGitlabActivity(container, username);
+    } else {
+      await loadGithubActivity(container, username);
+    }
+  } catch (e) {
+    container.innerHTML = `<p class="text-red-400/70 text-xs text-center py-4">Erreur : ${escHtml(e.message)}</p>`;
+  }
+}
+
+async function loadGithubActivity(container, username) {
+  // Heatmap via proxy PHP (inclut les contributions privées si activées sur le profil GitHub)
+  const [contribRes, profileRes, eventsRes] = await Promise.all([
+    apiFetch(`/api/v1/github?username=${encodeURIComponent(username)}`, null, 'GET'),
+    fetch(`https://api.github.com/users/${encodeURIComponent(username)}`).then(r => r.ok ? r.json() : {}),
+    fetch(`https://api.github.com/users/${encodeURIComponent(username)}/events?per_page=30`).then(r => r.ok ? r.json() : []),
+  ]);
+
+  const activityMap = contribRes.contributions || {};
+  const profile     = profileRes || {};
+  const events      = Array.isArray(eventsRes) ? eventsRes : [];
+  const recent      = parseGithubEvents(events.slice(0, 6));
+  const total       = contribRes.total ?? 0;
+  const hasPrivate  = profile.private_gists !== undefined; // indicateur qu'on a des données complètes
+
+  container.innerHTML = `
+    <div class="flex items-center gap-2 mb-3">
+      ${profile.avatar_url ? `<img src="${escHtml(profile.avatar_url)}" class="w-7 h-7 rounded-full">` : '<span class="text-lg">⚫</span>'}
+      <a href="https://github.com/${encodeURIComponent(username)}" target="_blank"
+         class="text-sm font-semibold text-white/90 hover:text-brand transition">${escHtml(username)}</a>
+      <span class="text-xs text-white/30 ml-auto" title="Contributions sur 1 an">${total > 0 ? total + ' contrib.' : ''}</span>
+    </div>
+    ${renderHeatmap(activityMap, '#6366f1')}
+    ${recent.length ? `<div class="mt-3 space-y-1">${recent.map(e => `
+      <div class="flex items-start gap-1.5 text-xs text-white/60">
+        <span class="flex-shrink-0">${e.icon}</span>
+        <span class="truncate">${escHtml(e.text)}</span>
+        <span class="flex-shrink-0 text-white/25 ml-auto">${e.when}</span>
+      </div>`).join('')}
+    </div>` : ''}`;
+}
+
+async function loadGitlabActivity(container, username) {
+  // Proxy PHP : cache 1h, évite le CORS et les requêtes répétées à GitLab
+  const d = await apiFetch(`/api/v1/github?username=${encodeURIComponent(username)}&platform=gitlab`, null, 'GET');
+
+  container.innerHTML = `
+    <div class="flex items-center gap-2 mb-3">
+      ${d.avatar ? `<img src="${escHtml(d.avatar)}" class="w-7 h-7 rounded-full">` : '<span class="text-lg">🦊</span>'}
+      <a href="https://gitlab.com/${encodeURIComponent(username)}" target="_blank"
+         class="text-sm font-semibold text-white/90 hover:text-orange-400 transition">${escHtml(username)}</a>
+      <span class="text-xs text-white/30 ml-auto" title="Contributions sur 1 an">${d.total > 0 ? d.total + ' contrib.' : 'GitLab'}</span>
+    </div>
+    ${renderHeatmap(d.contributions || {}, '#fc6d26')}`;
+}
+
+function buildActivityMap(dates) {
+  const map = {};
+  dates.forEach(d => { if (d) map[d] = (map[d] || 0) + 1; });
+  return map;
+}
+
+function renderHeatmap(activityMap, color) {
+  const today  = new Date();
+  const weeks  = 10;
+  const days   = weeks * 7;
+  const cells  = [];
+
+  for (let i = days - 1; i >= 0; i--) {
+    const d    = new Date(today);
+    d.setDate(d.getDate() - i);
+    const key  = d.toISOString().slice(0, 10);
+    const cnt  = activityMap[key] || 0;
+    const op   = cnt === 0 ? 0.07 : cnt < 3 ? 0.4 : cnt < 6 ? 0.7 : 1;
+    cells.push(`<div title="${key}: ${cnt}" style="width:9px;height:9px;border-radius:2px;background:${color};opacity:${op};"></div>`);
+  }
+
+  return `<div style="display:grid;grid-template-rows:repeat(7,9px);grid-auto-flow:column;gap:2px;">${cells.join('')}</div>`;
+}
+
+function parseGithubEvents(events) {
+  const icons = {
+    PushEvent:       '📤', PullRequestEvent: '🔀', IssuesEvent: '🐛',
+    WatchEvent:      '⭐', ForkEvent:        '🍴', CreateEvent: '🌿',
+    DeleteEvent:     '🗑️', ReleaseEvent:     '🚀', CommitCommentEvent: '💬',
+  };
+  return events.map(e => {
+    const icon = icons[e.type] || '📝';
+    const repo = e.repo?.name?.split('/')[1] || e.repo?.name || '';
+    const when = timeAgo(e.created_at);
+    let text = '';
+    if (e.type === 'PushEvent')        text = `Push → ${repo} (${e.payload?.commits?.length || 1} commit${(e.payload?.commits?.length || 1) > 1 ? 's' : ''})`;
+    else if (e.type === 'PullRequestEvent') text = `PR #${e.payload?.pull_request?.number} ${e.payload?.action} → ${repo}`;
+    else if (e.type === 'IssuesEvent') text = `Issue #${e.payload?.issue?.number} ${e.payload?.action} → ${repo}`;
+    else if (e.type === 'WatchEvent')  text = `Starred ${repo}`;
+    else if (e.type === 'ForkEvent')   text = `Forked ${repo}`;
+    else if (e.type === 'CreateEvent') text = `Created ${e.payload?.ref_type} ${e.payload?.ref || ''} in ${repo}`;
+    else                               text = `${e.type.replace('Event','')} in ${repo}`;
+    return { icon, text, when };
+  });
+}
+
+function timeAgo(iso) {
+  const diff = Math.floor((Date.now() - new Date(iso)) / 1000);
+  if (diff < 3600)  return Math.floor(diff / 60) + 'min';
+  if (diff < 86400) return Math.floor(diff / 3600) + 'h';
+  return Math.floor(diff / 86400) + 'j';
+}
 
 // ----------------------------------------------------------------
 // Auth
