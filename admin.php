@@ -32,6 +32,7 @@ $widgets = get_page_widgets($page['id']);
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>✏️ Admin — <?= htmlspecialchars($page['name']) ?></title>
 <link rel="icon" type="image/svg+xml" href="<?= BASE_URL ?>/assets/favicon.svg">
+<link rel="manifest" href="<?= BASE_URL ?>/manifest.php">
 <script src="https://cdn.tailwindcss.com"></script>
 <script>
 tailwind.config = {
@@ -199,6 +200,9 @@ tailwind.config = {
           'image'     => ['🌄', 'Image'],
           'pomodoro'  => ['🍅', 'Pomodoro'],
           'github'    => ['🐙', 'GitHub/Lab'],
+          'countdown' => ['⏳', 'Countdown'],
+          'crypto'    => ['📈', 'Crypto'],
+          'lofi'      => ['🎵', 'Lofi Radio'],
         ];
         foreach ($widgetTypes as $type => [$icon, $label]):
         ?>
@@ -388,7 +392,10 @@ tailwind.config = {
 const BASE_URL  = '<?= BASE_URL ?>';
 const PAGE_ID   = <?= $page['id'] ?>;
 const PAGE_SLUG = '<?= htmlspecialchars($slug) ?>';
-initGrid(true); // true = mode édition
+const PAGES_NAV = <?= json_encode(array_map(fn($p) => [
+    'name' => $p['name'], 'icon' => $p['icon'], 'slug' => $p['slug']
+], $pages), JSON_UNESCAPED_UNICODE) ?>;
+initGrid(true);
 </script>
 </body>
 </html>

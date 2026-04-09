@@ -46,6 +46,18 @@ function initGrid(editMode) {
     setInterval(() => updateClock(el), 1000);
   });
 
+  // Countdown
+  document.querySelectorAll('[data-widget-type="countdown"]').forEach(el => {
+    const cfg = JSON.parse(el.querySelector('[data-countdown-config]')?.dataset.countdownConfig || '{}');
+    initCountdown(el.dataset.widgetId, cfg);
+  });
+
+  // Crypto
+  document.querySelectorAll('[data-widget-type="crypto"]').forEach(el => {
+    const cfg = JSON.parse(el.querySelector('.crypto-container')?.dataset.cryptoConfig || '{}');
+    initCryptoWidget(el.dataset.widgetId, cfg);
+  });
+
   // Pomodoro
   document.querySelectorAll('[data-widget-type="pomodoro"]').forEach(el => {
     const wid = el.dataset.widgetId;
@@ -632,6 +644,294 @@ function initPomodoro(widgetId, cfg) {
 
   loadState();
   render();
+}
+
+// ----------------------------------------------------------------
+// Countdown
+// ----------------------------------------------------------------
+function initCountdown(widgetId, cfg) {
+  const target = new Date(cfg.target_date);
+  if (isNaN(target)) return;
+  const showSecs = cfg.show_seconds !== false;
+  const root = document.querySelector(`[data-widget-id="${widgetId}"]`);
+  if (!root) return;
+
+  const daysEl  = root.querySelector('.countdown-days');
+  const hoursEl = root.querySelector('.countdown-hours');
+  const minsEl  = root.querySelector('.countdown-mins');
+  const secsEl  = root.querySelector('.countdown-secs');
+  const doneEl  = root.querySelector('.countdown-done');
+  const dispEl  = root.querySelector('.countdown-display');
+
+  function update() {
+    const diff = target - Date.now();
+    if (diff <= 0) {
+      dispEl?.classList.add('hidden');
+      doneEl?.classList.remove('hidden');
+      clearInterval(timer);
+      return;
+    }
+    const d = Math.floor(diff / 86400000);
+    const h = Math.floor((diff % 86400000) / 3600000);
+    const m = Math.floor((diff % 3600000) / 60000);
+    const s = Math.floor((diff % 60000) / 1000);
+    if (daysEl)          daysEl.textContent  = String(d).padStart(2, '0');
+    if (hoursEl)         hoursEl.textContent = String(h).padStart(2, '0');
+    if (minsEl)          minsEl.textContent  = String(m).padStart(2, '0');
+    if (secsEl && showSecs) secsEl.textContent = String(s).padStart(2, '0');
+  }
+
+  update();
+  const timer = setInterval(update, 1000);
+}
+
+// ----------------------------------------------------------------
+// Crypto
+// ----------------------------------------------------------------
+const COIN_META = {
+  bitcoin:       { symbol: 'BTC', color: '#f7931a', char: '₿' },
+  ethereum:      { symbol: 'ETH', color: '#627eea', char: 'Ξ' },
+  solana:        { symbol: 'SOL', color: '#9945ff', char: '◎' },
+  cardano:       { symbol: 'ADA', color: '#0033ad', char: '₳' },
+  dogecoin:      { symbol: 'DOGE',color: '#c2a633', char: 'Ð' },
+  ripple:        { symbol: 'XRP', color: '#346aa9', char: '✕' },
+  polkadot:      { symbol: 'DOT', color: '#e6007a', char: '●' },
+  chainlink:     { symbol: 'LINK',color: '#2a5ada', char: '⬡' },
+  avalanche2:    { symbol: 'AVAX',color: '#e84142', char: '▲' },
+  'matic-network':{ symbol: 'MATIC',color: '#8247e5', char: '⬡' },
+};
+
+async function initCryptoWidget(widgetId, cfg) {
+  const root      = document.querySelector(`[data-widget-id="${widgetId}"][data-widget-type="crypto"]`);
+  const container = root?.querySelector('.crypto-container');
+  if (!container) return;
+
+  const coins    = (cfg.coins || ['bitcoin', 'ethereum']).join(',');
+  const currency = cfg.currency || 'eur';
+  const sym      = { eur: '€', usd: '$', gbp: '£', btc: '₿' }[currency] || currency.toUpperCase();
+
+  try {
+    const d    = await apiFetch(`/api/v1/crypto?coins=${encodeURIComponent(coins)}&currency=${currency}`, null, 'GET');
+    const data = d.data || {};
+
+    container.innerHTML = Object.entries(data).map(([id, prices]) => {
+      const meta   = COIN_META[id] || { symbol: id.toUpperCase().slice(0, 5), color: '#6366f1', char: '●' };
+      const price  = prices[currency];
+      const change = prices[`${currency}_24h_change`];
+      const pos    = change >= 0;
+      const priceStr = price >= 1000
+        ? price.toLocaleString('fr-FR', { maximumFractionDigits: 0 })
+        : price.toLocaleString('fr-FR', { minimumFractionDigits: 2, maximumFractionDigits: 4 });
+
+      return `<div class="flex items-center gap-3 px-2 py-2.5 rounded-xl hover:bg-white/5 transition">
+        <div class="w-9 h-9 rounded-full flex items-center justify-center text-base font-bold flex-shrink-0"
+             style="background:${meta.color}22;color:${meta.color}">${meta.char}</div>
+        <div class="flex-1 min-w-0">
+          <div class="text-sm font-semibold text-white/90">${meta.symbol}</div>
+          <div class="text-xs text-white/30 capitalize">${id}</div>
+        </div>
+        <div class="text-right">
+          <div class="text-sm font-mono font-semibold text-white/90">${priceStr} ${sym}</div>
+          <div class="text-xs font-mono ${pos ? 'text-green-400' : 'text-red-400'}">
+            ${pos ? '▲' : '▼'} ${Math.abs(change ?? 0).toFixed(2)}%
+          </div>
+        </div>
+      </div>`;
+    }).join('');
+  } catch (e) {
+    container.innerHTML = `<p class="text-red-400/70 text-xs text-center py-4">Erreur : ${escHtml(e.message)}</p>`;
+  }
+}
+
+// ----------------------------------------------------------------
+// Lofi Radio
+// ----------------------------------------------------------------
+function toggleLofi(widgetId) {
+  const root   = document.querySelector(`[data-widget-id="${widgetId}"][data-widget-type="lofi"]`);
+  const cover  = root?.querySelector('.lofi-cover');
+  const player = root?.querySelector('.lofi-player');
+  const btn    = root?.querySelector('.lofi-play-btn');
+  const ui     = root?.querySelector('.lofi-ui');
+  if (!player) return;
+
+  const playing = !player.classList.contains('hidden');
+  if (playing) {
+    player.classList.add('hidden');
+    cover?.classList.remove('opacity-0');
+    if (btn) btn.textContent = '▶';
+    if (ui)  ui.style.opacity = '1';
+  } else {
+    // Charger l'iframe seulement au premier clic (lazy)
+    const iframe = player.querySelector('iframe');
+    if (iframe && !iframe.src && iframe.dataset.src) {
+      iframe.src = iframe.dataset.src;
+    }
+    player.classList.remove('hidden');
+    cover?.classList.add('opacity-0');
+    if (btn) btn.textContent = '⏸';
+    if (ui)  ui.style.opacity = '0';
+  }
+}
+
+// ----------------------------------------------------------------
+// Ctrl+K — Palette de commande
+// ----------------------------------------------------------------
+let paletteSelected = 0;
+
+function buildPaletteItems(query) {
+  const q = query.toLowerCase().trim();
+  const items = [];
+
+  // Pages
+  if (typeof PAGES_NAV !== 'undefined') {
+    PAGES_NAV.forEach(p => {
+      if (!q || p.name.toLowerCase().includes(q)) {
+        items.push({ icon: p.icon, label: p.name, sub: 'Page', action: () => { window.location.href = BASE_URL + '/p/' + p.slug; } });
+      }
+    });
+  }
+
+  // Bookmarks depuis le DOM
+  document.querySelectorAll('.bookmarks-list a[href], a[href][class*="bookmark"]').forEach(a => {
+    const title = a.querySelector('span')?.textContent?.trim() || a.href;
+    if (!q || title.toLowerCase().includes(q) || a.href.toLowerCase().includes(q)) {
+      const href = a.href;
+      items.push({ icon: '🔖', label: title, sub: a.hostname || href, action: () => window.open(href, '_blank') });
+    }
+  });
+
+  // Actions fixes
+  const actions = [
+    { icon: '✏️', label: 'Administrer', sub: 'Admin', action: () => { window.location.href = BASE_URL + '/admin.php'; } },
+    { icon: '🔒', label: 'Déconnexion', sub: '', action: logout },
+  ];
+  actions.forEach(a => { if (!q || a.label.toLowerCase().includes(q)) items.push(a); });
+
+  return items.slice(0, 8);
+}
+
+function renderPaletteItems(items) {
+  const el = document.getElementById('palette-results');
+  if (!el) return;
+  paletteSelected = 0;
+
+  if (!items.length) {
+    el.innerHTML = '<p class="text-white/30 text-sm text-center py-4">Aucun résultat</p>';
+    return;
+  }
+
+  el.innerHTML = items.map((item, i) => `
+    <div class="palette-item flex items-center gap-3 px-4 py-2.5 cursor-pointer transition
+                ${i === 0 ? 'bg-white/10' : 'hover:bg-white/5'}"
+         data-index="${i}" onclick="paletteActivate(${i})">
+      <span class="text-lg w-6 text-center flex-shrink-0">${escHtml(item.icon)}</span>
+      <div class="flex-1 min-w-0">
+        <div class="text-sm text-white/90 truncate">${escHtml(item.label)}</div>
+        ${item.sub ? `<div class="text-xs text-white/30 truncate">${escHtml(item.sub)}</div>` : ''}
+      </div>
+    </div>`).join('');
+}
+
+let _paletteItems = [];
+function filterPalette(query) {
+  _paletteItems = buildPaletteItems(query);
+  renderPaletteItems(_paletteItems);
+}
+
+function paletteActivate(index) {
+  _paletteItems[index]?.action?.();
+  closePalette();
+}
+
+function palettekeydown(e) {
+  const items = document.querySelectorAll('.palette-item');
+  if (e.key === 'ArrowDown') {
+    e.preventDefault();
+    paletteSelected = Math.min(paletteSelected + 1, items.length - 1);
+  } else if (e.key === 'ArrowUp') {
+    e.preventDefault();
+    paletteSelected = Math.max(paletteSelected - 1, 0);
+  } else if (e.key === 'Enter') {
+    paletteActivate(paletteSelected);
+    return;
+  } else if (e.key === 'Escape') {
+    closePalette();
+    return;
+  }
+  items.forEach((el, i) => el.classList.toggle('bg-white/10', i === paletteSelected));
+  items[paletteSelected]?.scrollIntoView({ block: 'nearest' });
+}
+
+function openPalette() {
+  const overlay = document.getElementById('palette-overlay');
+  if (!overlay) return;
+  overlay.classList.remove('hidden');
+  overlay.classList.add('flex');
+  const input = document.getElementById('palette-input');
+  if (input) { input.value = ''; input.focus(); }
+  _paletteItems = buildPaletteItems('');
+  renderPaletteItems(_paletteItems);
+}
+
+function closePalette() {
+  const overlay = document.getElementById('palette-overlay');
+  if (!overlay) return;
+  overlay.classList.add('hidden');
+  overlay.classList.remove('flex');
+}
+
+// Raccourcis globaux
+document.addEventListener('keydown', e => {
+  // Ctrl+K ou Cmd+K → palette
+  if ((e.ctrlKey || e.metaKey) && e.key === 'k') {
+    e.preventDefault();
+    const overlay = document.getElementById('palette-overlay');
+    if (overlay?.classList.contains('hidden')) openPalette();
+    else closePalette();
+    return;
+  }
+
+  // Touches 1-9 → navigation pages (hors inputs)
+  if (e.target.matches('input, textarea, select, [contenteditable]')) return;
+  if (!e.ctrlKey && !e.metaKey && !e.altKey && e.key >= '1' && e.key <= '9') {
+    const idx = parseInt(e.key) - 1;
+    if (typeof PAGES_NAV !== 'undefined' && PAGES_NAV[idx]) {
+      window.location.href = BASE_URL + '/p/' + PAGES_NAV[idx].slug;
+    }
+  }
+});
+
+// ----------------------------------------------------------------
+// Search bangs (!yt, !gh, !w…)
+// ----------------------------------------------------------------
+function handleSearch(e, form) {
+  const input = form.querySelector('input[name="q"]');
+  const val   = (input?.value || '').trim();
+  const bang  = val.match(/^!(\S+)\s*(.*)/s);
+
+  if (bang) {
+    e.preventDefault();
+    const key   = bang[1].toLowerCase();
+    const query = bang[2].trim();
+    const bangs = {
+      g:    'https://www.google.com/search?q=',
+      yt:   'https://www.youtube.com/results?search_query=',
+      gh:   'https://github.com/search?q=',
+      gl:   'https://gitlab.com/search?search=',
+      w:    'https://fr.wikipedia.org/wiki/Special:Search?search=',
+      r:    'https://www.reddit.com/search/?q=',
+      npm:  'https://www.npmjs.com/search?q=',
+      dd:   'https://duckduckgo.com/?q=',
+      x:    'https://x.com/search?q=',
+      maps: 'https://maps.google.com/?q=',
+      img:  'https://www.google.com/search?tbm=isch&q=',
+    };
+    const url = bangs[key];
+    window.open((url || 'https://www.google.com/search?q=' + encodeURIComponent(val))
+                + encodeURIComponent(query), '_blank');
+    if (input) input.value = '';
+  }
+  // Sinon, submit normal du form
 }
 
 // ----------------------------------------------------------------
