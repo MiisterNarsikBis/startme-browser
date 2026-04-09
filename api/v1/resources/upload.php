@@ -1,6 +1,23 @@
 <?php
-/* POST /api/v1/upload?page_id=X
-   multipart/form-data, champ : "bg" */
+/* GET  /api/v1/upload          → liste les images uploadées par l'utilisateur
+   POST /api/v1/upload?page_id=X  multipart/form-data, champ : "bg" */
+
+// GET — liste des images uploadées
+if ($method === 'GET') {
+    $files = [];
+    if (is_dir(UPLOAD_DIR)) {
+        foreach (glob(UPLOAD_DIR . 'bg_' . $uid . '_*.{jpg,jpeg,png,webp,gif,avif}', GLOB_BRACE) as $f) {
+            $files[] = [
+                'url'  => UPLOAD_URL . basename($f),
+                'name' => basename($f),
+                'size' => filesize($f),
+                'time' => filemtime($f),
+            ];
+        }
+        usort($files, fn($a, $b) => $b['time'] - $a['time']);
+    }
+    json_response($files);
+}
 
 if ($method !== 'POST') json_error('Méthode invalide.', 405);
 

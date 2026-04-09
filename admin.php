@@ -39,11 +39,25 @@ tailwind.config = {
   darkMode: 'class',
   theme: {
     extend: {
-      colors: { brand: { DEFAULT: '#6366f1', dark: '#4f46e5' } },
+      colors: {
+        brand: {
+          DEFAULT: 'rgb(var(--brand) / <alpha-value>)',
+          dark:    'rgb(var(--brand-dark) / <alpha-value>)',
+        }
+      },
     }
   }
 }
 </script>
+<?php
+$accent   = $page['accent_color'] ?? '#6366f1';
+$accent   = preg_match('/^#[0-9a-fA-F]{6}$/', $accent) ? $accent : '#6366f1';
+$r        = hexdec(substr($accent, 1, 2));
+$g        = hexdec(substr($accent, 3, 2));
+$b        = hexdec(substr($accent, 5, 2));
+$rDark    = (int)($r * 0.8); $gDark = (int)($g * 0.8); $bDark = (int)($b * 0.8);
+?>
+<style>:root { --brand: <?= "$r $g $b" ?>; --brand-dark: <?= "$rDark $gDark $bDark" ?>; }</style>
 
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/gridstack@10/dist/gridstack.min.css">
@@ -295,6 +309,30 @@ tailwind.config = {
               <input type="file" accept="image/*" class="hidden" onchange="adminApp.uploadBg(this)">
             </label>
             <div id="bg-preview" class="h-24 mt-2 rounded-xl bg-cover bg-center bg-white/5 transition-all"></div>
+            <!-- Galerie des images déjà uploadées -->
+            <div id="bg-gallery" class="hidden mt-3">
+              <p class="text-xs text-white/40 mb-2">Mes images :</p>
+              <div id="bg-gallery-grid" class="grid grid-cols-3 gap-2 max-h-36 overflow-y-auto"></div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Couleur d'accent -->
+        <div>
+          <label class="text-sm text-white/60 block mb-1">Couleur d'accent
+            <span class="text-white/30 text-xs ml-1">(boutons, bordures…)</span>
+          </label>
+          <div class="flex items-center gap-3">
+            <input id="pg-accent" type="color" value="<?= htmlspecialchars($accent) ?>"
+              class="w-12 h-10 rounded-xl cursor-pointer bg-transparent border border-white/20 p-1"
+              oninput="adminApp.previewAccent(this.value)">
+            <div class="flex flex-wrap gap-1.5">
+              <?php foreach(['#6366f1','#8b5cf6','#ec4899','#ef4444','#f97316','#eab308','#22c55e','#06b6d4','#3b82f6','#64748b'] as $c): ?>
+              <button type="button" onclick="adminApp.pickAccent('<?= $c ?>')"
+                class="w-6 h-6 rounded-full border-2 border-white/20 hover:border-white/60 transition"
+                style="background:<?= $c ?>" title="<?= $c ?>"></button>
+              <?php endforeach; ?>
+            </div>
           </div>
         </div>
 
@@ -392,6 +430,8 @@ tailwind.config = {
 const BASE_URL  = '<?= BASE_URL ?>';
 const PAGE_ID   = <?= $page['id'] ?>;
 const PAGE_SLUG = '<?= htmlspecialchars($slug) ?>';
+const PAGE_BG   = <?= json_encode(['type' => $page['bg_type'], 'value' => $page['bg_value']]) ?>;
+const PAGE_ACCENT = '<?= $accent ?>';
 const PAGES_NAV = <?= json_encode(array_map(fn($p) => [
     'name' => $p['name'], 'icon' => $p['icon'], 'slug' => $p['slug']
 ], $pages), JSON_UNESCAPED_UNICODE) ?>;
