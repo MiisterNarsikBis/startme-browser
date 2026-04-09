@@ -497,39 +497,74 @@ function showToast(message, type = 'success') {
 // Pomodoro
 // ----------------------------------------------------------------
 function initPomodoro(widgetId, cfg) {
-  const workMin      = (cfg.work_minutes       || 25) * 60;
-  const shortBreakMin = (cfg.break_minutes      || 5)  * 60;
-  const longBreakMin  = (cfg.long_break_minutes || 15) * 60;
-  const longBreakEvery = cfg.long_break_every   || 4;
+  const workMin        = (cfg.work_minutes       || 25) * 60;
+  const shortBreakMin  = (cfg.break_minutes      || 5)  * 60;
+  const longBreakMin   = (cfg.long_break_minutes || 15) * 60;
+  const longBreakEvery = cfg.long_break_every    || 4;
+  const STORAGE_KEY    = `pomo_${widgetId}`;
 
-  const root     = document.querySelector(`[data-widget-id="${widgetId}"]`);
-  const display  = root?.querySelector('.pomo-display');
-  const modeEl   = root?.querySelector('.pomo-mode');
-  const sessEl   = root?.querySelector('.pomo-sessions');
+  const root      = document.querySelector(`[data-widget-id="${widgetId}"]`);
+  const display   = root?.querySelector('.pomo-display');
+  const modeEl    = root?.querySelector('.pomo-mode');
+  const sessEl    = root?.querySelector('.pomo-sessions');
   const btnToggle = root?.querySelector('.pomo-toggle');
   if (!display || !btnToggle) return;
 
-  let state    = 'work';   // 'work' | 'short-break' | 'long-break'
-  let sessions = 0;
+  let state     = 'work';
+  let sessions  = 0;
   let remaining = workMin;
-  let running  = false;
-  let interval = null;
+  let running   = false;
+  let interval  = null;
 
-  function durations() {
-    return { work: workMin, 'short-break': shortBreakMin, 'long-break': longBreakMin };
+  const durations  = () => ({ work: workMin, 'short-break': shortBreakMin, 'long-break': longBreakMin });
+  const modeLabels = () => ({ work: '🍅 Travail', 'short-break': '☕ Pause courte', 'long-break': '🛋️ Pause longue' });
+
+  // --- Persistance localStorage ---
+  function saveState() {
+    localStorage.setItem(STORAGE_KEY, JSON.stringify({
+      state, sessions, remaining, running,
+      savedAt: running ? Date.now() : null,  // timestamp si en cours, null si en pause
+    }));
   }
 
-  function modeLabels() {
-    return { work: '🍅 Travail', 'short-break': '☕ Pause courte', 'long-break': '🛋️ Pause longue' };
+  function loadState() {
+    try {
+      const raw = localStorage.getItem(STORAGE_KEY);
+      if (!raw) return;
+      const s = JSON.parse(raw);
+
+      state    = s.state    || 'work';
+      sessions = s.sessions || 0;
+      running  = false; // on reprend toujours en pause, on recalcule d'abord
+
+      // Recalculer le temps écoulé si le timer tournait quand on est partis
+      if (s.running && s.savedAt) {
+        const elapsed = Math.floor((Date.now() - s.savedAt) / 1000);
+        remaining = Math.max(0, (s.remaining || workMin) - elapsed);
+        if (remaining <= 0) {
+          // La phase s'est terminée pendant l'absence → passer à la suivante (arrêtée)
+          if (state === 'work') {
+            sessions++;
+            state = sessions % longBreakEvery === 0 ? 'long-break' : 'short-break';
+          } else {
+            state = 'work';
+          }
+          remaining = durations()[state];
+          showToast(modeLabels()[state] + ' (terminé pendant ton absence)', 'info');
+        }
+      } else {
+        remaining = s.remaining ?? durations()[state];
+      }
+    } catch {}
   }
 
+  // --- Rendu ---
   function render() {
     const m = Math.floor(remaining / 60).toString().padStart(2, '0');
     const s = (remaining % 60).toString().padStart(2, '0');
     display.textContent = `${m}:${s}`;
     modeEl.textContent  = modeLabels()[state];
 
-    // Points de sessions (○●)
     const dots = Array.from({ length: longBreakEvery }, (_, i) =>
       i < (sessions % longBreakEvery)
         ? '<span class="inline-block w-2.5 h-2.5 rounded-full bg-brand"></span>'
@@ -553,6 +588,7 @@ function initPomodoro(widgetId, cfg) {
     }
     remaining = durations()[state];
     render();
+    saveState();
     showToast(modeLabels()[state] + ' !', 'info');
   }
 
@@ -566,21 +602,25 @@ function initPomodoro(widgetId, cfg) {
         if (remaining <= 0) { nextPhase(); return; }
         remaining--;
         render();
+        saveState();
       }, 1000);
     }
     render();
+    saveState();
   });
 
   root.querySelector('.pomo-skip')?.addEventListener('click', nextPhase);
   root.querySelector('.pomo-reset')?.addEventListener('click', () => {
     clearInterval(interval);
-    running   = false;
-    state     = 'work';
-    sessions  = 0;
-    remaining = workMin;
+    running = false; state = 'work'; sessions = 0; remaining = workMin;
     render();
+    saveState();
   });
 
+  // Sauvegarder avant de quitter la page
+  window.addEventListener('beforeunload', saveState);
+
+  loadState();
   render();
 }
 
