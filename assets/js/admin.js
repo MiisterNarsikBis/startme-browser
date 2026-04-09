@@ -45,6 +45,9 @@ const adminApp = {
       image:     { title: 'Image',     config: { url: '', fit: 'cover', caption: '' },                          w: 3, h: 30 },
       pomodoro:  { title: 'Pomodoro',  config: { work_minutes: 25, break_minutes: 5, long_break_minutes: 15, long_break_every: 4 }, w: 2, h: 28 },
       github:    { title: 'GitHub',    config: { username: '', platform: 'github' },                            w: 3, h: 36 },
+      countdown: { title: 'Countdown', config: { target_date: '', label: 'Événement', show_seconds: true },     w: 3, h: 18 },
+      crypto:    { title: 'Crypto',    config: { coins: ['bitcoin', 'ethereum'], currency: 'eur' },             w: 3, h: 24 },
+      lofi:      { title: 'Lofi Radio',config: { video_id: 'jfKfPfyJRdk', label: 'Lofi Girl ☕' },             w: 2, h: 30 },
     };
 
     const def = defaults[type] || { title: type, config: {}, w: 3, h: 4 };
@@ -316,6 +319,65 @@ const adminApp = {
             </div>
           </div>`;
         break;
+
+      case 'countdown':
+        html += `
+          <div class="space-y-3">
+            <div>
+              <label class="text-sm text-white/60 block mb-1">Label</label>
+              <input id="wf-cd-label" type="text" value="${escHtml(config.label||'')}"
+                class="form-input w-full" placeholder="Vacances, Deadline…">
+            </div>
+            <div>
+              <label class="text-sm text-white/60 block mb-1">Date & heure cible</label>
+              <input id="wf-cd-date" type="datetime-local"
+                value="${escHtml((config.target_date||'').slice(0,16))}"
+                class="form-input w-full">
+            </div>
+            <div class="flex items-center gap-3">
+              <input type="checkbox" id="wf-cd-secs" ${config.show_seconds!==false?'checked':''} class="accent-indigo-500 w-4 h-4">
+              <label for="wf-cd-secs" class="text-sm text-white/70">Afficher les secondes</label>
+            </div>
+          </div>`;
+        break;
+
+      case 'crypto':
+        html += `
+          <div class="space-y-3">
+            <div>
+              <label class="text-sm text-white/60 block mb-1">Devises (séparées par virgule)</label>
+              <input id="wf-crypto-coins" type="text" value="${escHtml((config.coins||['bitcoin','ethereum']).join(', '))}"
+                class="form-input w-full" placeholder="bitcoin, ethereum, solana…">
+              <p class="text-xs text-white/30 mt-1">IDs CoinGecko : bitcoin, ethereum, solana, cardano, dogecoin…</p>
+            </div>
+            <div>
+              <label class="text-sm text-white/60 block mb-1">Devise d'affichage</label>
+              <select id="wf-crypto-currency" class="form-input w-full">
+                <option value="eur" ${(config.currency||'eur')==='eur'?'selected':''}>€ EUR</option>
+                <option value="usd" ${config.currency==='usd'?'selected':''}>$ USD</option>
+                <option value="gbp" ${config.currency==='gbp'?'selected':''}>£ GBP</option>
+                <option value="btc" ${config.currency==='btc'?'selected':''}>₿ BTC</option>
+              </select>
+            </div>
+          </div>`;
+        break;
+
+      case 'lofi':
+        html += `
+          <div class="space-y-3">
+            <div>
+              <label class="text-sm text-white/60 block mb-1">Label</label>
+              <input id="wf-lofi-label" type="text" value="${escHtml(config.label||'')}"
+                class="form-input w-full" placeholder="Lofi Girl ☕">
+            </div>
+            <div>
+              <label class="text-sm text-white/60 block mb-1">URL ou ID YouTube</label>
+              <input id="wf-lofi-video" type="text" value="${escHtml(config.video_id||'')}"
+                class="form-input w-full" placeholder="jfKfPfyJRdk ou https://youtube.com/watch?v=…">
+              <p class="text-xs text-white/30 mt-1">Lofi Girl par défaut : jfKfPfyJRdk</p>
+            </div>
+          </div>`;
+        break;
     }
 
     return html;
@@ -446,6 +508,22 @@ const adminApp = {
         config.username = document.getElementById('wf-gh-username')?.value.trim();
         config.platform = document.getElementById('wf-gh-platform')?.value;
         break;
+      case 'countdown':
+        config.label        = document.getElementById('wf-cd-label')?.value.trim();
+        config.target_date  = document.getElementById('wf-cd-date')?.value;
+        config.show_seconds = document.getElementById('wf-cd-secs')?.checked;
+        break;
+      case 'crypto':
+        config.coins    = document.getElementById('wf-crypto-coins')?.value.split(',').map(s => s.trim().toLowerCase()).filter(Boolean);
+        config.currency = document.getElementById('wf-crypto-currency')?.value;
+        break;
+      case 'lofi': {
+        const raw = document.getElementById('wf-lofi-video')?.value.trim() || 'jfKfPfyJRdk';
+        const match = raw.match(/(?:v=|youtu\.be\/)([a-zA-Z0-9_-]{11})/);
+        config.video_id = match ? match[1] : raw;
+        config.label    = document.getElementById('wf-lofi-label')?.value.trim();
+        break;
+      }
     }
 
     await apiFetch(`/api/v1/widgets/${id}`, { title, config }, 'PUT');

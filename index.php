@@ -34,6 +34,7 @@ $widgets = get_page_widgets($page['id']);
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title><?= htmlspecialchars($page['icon'] . ' ' . $page['name']) ?> — Startme</title>
 <link rel="icon" type="image/svg+xml" href="<?= BASE_URL ?>/assets/favicon.svg">
+<link rel="manifest" href="<?= BASE_URL ?>/manifest.php">
 
 <!-- Tailwind -->
 <script src="https://cdn.tailwindcss.com"></script>
@@ -147,11 +148,36 @@ tailwind.config = {
   </div>
 </main>
 
+<!-- Palette Ctrl+K -->
+<div id="palette-overlay" class="fixed inset-0 z-[200] bg-black/60 backdrop-blur-sm hidden items-start justify-center pt-[15vh] px-4"
+     onclick="if(event.target===this)closePalette()">
+  <div class="w-full max-w-lg glass-dark rounded-2xl overflow-hidden shadow-2xl border border-white/10">
+    <div class="flex items-center gap-3 px-4 py-3 border-b border-white/10">
+      <span class="text-white/40">⌘</span>
+      <input id="palette-input" type="text" placeholder="Rechercher une page, un favori…"
+             class="flex-1 bg-transparent text-white placeholder-white/30 focus:outline-none text-sm"
+             oninput="filterPalette(this.value)"
+             onkeydown="palettekeydown(event)">
+      <kbd class="text-xs text-white/20 border border-white/10 rounded px-1.5 py-0.5">Esc</kbd>
+    </div>
+    <div id="palette-results" class="max-h-80 overflow-y-auto py-2"></div>
+  </div>
+</div>
+
 <script src="<?= BASE_URL ?>/assets/js/app.js?v=<?= filemtime(__DIR__.'/assets/js/app.js') ?>"></script>
 <script>
-const BASE_URL = '<?= BASE_URL ?>';
+const BASE_URL  = '<?= BASE_URL ?>';
 const PAGE_SLUG = '<?= htmlspecialchars($slug) ?>';
-initGrid(false); // false = mode lecture seule
+const PAGES_NAV = <?= json_encode(array_map(fn($p) => [
+    'name' => $p['name'], 'icon' => $p['icon'], 'slug' => $p['slug']
+], $pages), JSON_UNESCAPED_UNICODE) ?>;
+
+initGrid(false);
+
+// PWA Service Worker
+if ('serviceWorker' in navigator) {
+  navigator.serviceWorker.register('<?= BASE_URL ?>/sw.js').catch(() => {});
+}
 </script>
 </body>
 </html>
@@ -191,6 +217,9 @@ function renderWidget(array $w): void {
         'image'     => renderImage($config),
         'pomodoro'  => renderPomodoro($id, $config),
         'github'    => renderGithub($id, $config),
+        'countdown' => renderCountdown($id, $config),
+        'crypto'    => renderCrypto($id, $config),
+        'lofi'      => renderLofi($id, $config),
         default     => null,
     };
 
@@ -329,14 +358,17 @@ function renderTodo(int $id): void {
 function renderSearch(array $config): void {
     $engine = $config['engine'] ?? 'google';
     $engines = [
-        'google'     => ['https://www.google.com/search?q=', 'Rechercher sur Google…'],
-        'duckduckgo' => ['https://duckduckgo.com/?q=',       'Rechercher sur DuckDuckGo…'],
-        'brave'      => ['https://search.brave.com/search?q=','Rechercher sur Brave…'],
-        'bing'       => ['https://www.bing.com/search?q=',   'Rechercher sur Bing…'],
+        'google'     => ['https://www.google.com/search?q=', 'Rechercher… ou !yt !gh !w !r !npm'],
+        'duckduckgo' => ['https://duckduckgo.com/?q=',       'Rechercher… ou !yt !gh !w !r !npm'],
+        'brave'      => ['https://search.brave.com/search?q=','Rechercher… ou !yt !gh !w !r !npm'],
+        'bing'       => ['https://www.bing.com/search?q=',   'Rechercher… ou !yt !gh !w !r !npm'],
     ];
     [$action, $placeholder] = $engines[$engine] ?? $engines['google'];
-    echo '<form action="' . $action . '" target="_blank" class="flex gap-2 items-center h-full">
-            <input type="text" name="q" placeholder="' . $placeholder . '" autofocus
+    echo '<form data-search-engine="' . htmlspecialchars($engine, ENT_QUOTES) . '"
+               data-search-action="' . htmlspecialchars($action, ENT_QUOTES) . '"
+               onsubmit="handleSearch(event, this)"
+               class="flex gap-2 items-center h-full">
+            <input type="text" name="q" placeholder="' . htmlspecialchars($placeholder) . '" autofocus
               class="flex-1 bg-white/10 border border-white/15 rounded-xl px-4 py-2.5 text-sm
                      text-white placeholder-white/40 focus:outline-none focus:border-brand focus:ring-1 focus:ring-brand">
             <button type="submit"
@@ -430,6 +462,75 @@ function renderGithub(int $id, array $config): void {
                 <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8z"/>
               </svg>
               Chargement…
+            </div>
+          </div>';
+}
+
+function renderCountdown(int $id, array $config): void {
+    $label    = htmlspecialchars($config['label'] ?? 'Événement');
+    $target   = $config['target_date'] ?? '';
+    $showSecs = $config['show_seconds'] ?? true;
+    $cfg      = htmlspecialchars(json_encode([
+        'target_date'  => $target,
+        'label'        => $config['label'] ?? '',
+        'show_seconds' => $showSecs,
+    ], JSON_UNESCAPED_UNICODE), ENT_QUOTES);
+
+    if (!$target) {
+        echo '<p class="text-white/30 text-sm text-center py-6">Configurez une date cible dans les paramètres.</p>';
+        return;
+    }
+    $secsBlock = $showSecs ? '
+              <div class="text-2xl font-bold text-white/20">:</div>
+              <div class="text-center"><div class="countdown-secs text-3xl font-bold font-mono tabular-nums text-white/60">--</div><div class="text-xs text-white/30 mt-1">sec</div></div>' : '';
+
+    echo '<div class="flex flex-col items-center justify-center h-full gap-3 select-none"
+               data-countdown-config="' . $cfg . '">
+            <div class="text-xs text-white/40 font-medium tracking-widest uppercase">' . $label . '</div>
+            <div class="countdown-display flex items-center gap-3">
+              <div class="text-center"><div class="countdown-days text-4xl font-bold font-mono tabular-nums text-white">--</div><div class="text-xs text-white/30 mt-1">jours</div></div>
+              <div class="text-2xl font-bold text-white/20">:</div>
+              <div class="text-center"><div class="countdown-hours text-4xl font-bold font-mono tabular-nums text-white">--</div><div class="text-xs text-white/30 mt-1">h</div></div>
+              <div class="text-2xl font-bold text-white/20">:</div>
+              <div class="text-center"><div class="countdown-mins text-4xl font-bold font-mono tabular-nums text-white">--</div><div class="text-xs text-white/30 mt-1">min</div></div>
+              ' . $secsBlock . '
+            </div>
+            <div class="countdown-done hidden text-xl font-bold text-green-400">🎉 C\'est arrivé !</div>
+          </div>';
+}
+
+function renderCrypto(int $id, array $config): void {
+    $cfg = htmlspecialchars(json_encode([
+        'coins'    => $config['coins']    ?? ['bitcoin', 'ethereum'],
+        'currency' => $config['currency'] ?? 'eur',
+    ], JSON_UNESCAPED_UNICODE), ENT_QUOTES);
+
+    echo '<div class="crypto-container h-full overflow-auto" data-crypto-config="' . $cfg . '">
+            <div class="flex items-center justify-center text-white/30 text-sm py-6">⏳ Chargement…</div>
+          </div>';
+}
+
+function renderLofi(int $id, array $config): void {
+    $videoId = htmlspecialchars($config['video_id'] ?? 'jfKfPfyJRdk', ENT_QUOTES);
+    $label   = htmlspecialchars($config['label'] ?? 'Lofi Radio');
+    $thumb   = 'https://img.youtube.com/vi/' . $videoId . '/mqdefault.jpg';
+
+    echo '<div class="lofi-widget relative h-full overflow-hidden rounded-lg" data-video-id="' . $videoId . '" data-widget-id="' . $id . '">
+            <div class="lofi-cover absolute inset-0 bg-cover bg-center transition-opacity duration-500"
+                 style="background-image:url(' . htmlspecialchars($thumb) . ')">
+              <div class="absolute inset-0 bg-black/50"></div>
+            </div>
+            <div class="lofi-player hidden absolute inset-0">
+              <iframe src="" data-src="https://www.youtube.com/embed/' . $videoId . '?autoplay=1&controls=1&loop=1&playlist=' . $videoId . '"
+                class="w-full h-full" frameborder="0"
+                allow="autoplay; encrypted-media" allowfullscreen></iframe>
+            </div>
+            <div class="lofi-ui relative z-10 h-full flex flex-col items-center justify-center gap-3 cursor-pointer"
+                 onclick="toggleLofi(' . $id . ')">
+              <div class="text-white font-semibold text-sm drop-shadow text-center px-4">' . $label . '</div>
+              <div class="lofi-play-btn w-14 h-14 rounded-full bg-white/20 hover:bg-white/30 backdrop-blur-sm
+                           flex items-center justify-center text-2xl transition border border-white/30">▶</div>
+              <div class="text-xs text-white/40">Cliquer pour écouter</div>
             </div>
           </div>';
 }

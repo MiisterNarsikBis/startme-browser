@@ -5,7 +5,7 @@
    DELETE /api/v1/widgets/{id}
    POST   /api/v1/widgets/reorder     { items: [{id,x,y,w,h}] } */
 
-$VALID_TYPES = ['bookmarks','rss','notes','todo','search','weather','clock','embed','calendar','image','pomodoro','github'];
+$VALID_TYPES = ['bookmarks','rss','notes','todo','search','weather','clock','embed','calendar','image','pomodoro','github','countdown','crypto','lofi'];
 
 function owns_page_v1(int $uid, int $page_id): bool {
     return db_fetch('SELECT id FROM pages WHERE id=? AND user_id=?', [$page_id, $uid]) !== null;
