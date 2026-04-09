@@ -607,10 +607,17 @@ const adminApp = {
 
       gallery.classList.remove('hidden');
       grid.innerHTML = files.map(f => `
-        <button type="button" onclick="adminApp.selectGalleryImg('${escHtml(f.url)}')"
-          class="relative h-16 rounded-lg overflow-hidden border-2 border-white/10 hover:border-brand/60 transition bg-cover bg-center"
-          style="background-image:url('${escHtml(f.url)}')" title="${escHtml(f.name)}">
-        </button>`).join('');
+        <div class="relative h-16 group">
+          <button type="button" onclick="adminApp.selectGalleryImg('${escHtml(f.url)}')"
+            class="w-full h-full rounded-lg overflow-hidden border-2 border-white/10 hover:border-brand/60 transition bg-cover bg-center block"
+            style="background-image:url('${escHtml(f.url)}')" title="${escHtml(f.name)}">
+          </button>
+          <button type="button" onclick="adminApp.deleteBgImage('${escHtml(f.name)}', this)"
+            class="absolute top-0.5 right-0.5 w-5 h-5 rounded-full bg-black/70 text-white/60
+                   hover:bg-red-500 hover:text-white text-[10px] leading-none opacity-0
+                   group-hover:opacity-100 transition flex items-center justify-center"
+            title="Supprimer">✕</button>
+        </div>`).join('');
       this._bgGalleryLoaded = true;
     } catch {}
   },
@@ -618,6 +625,24 @@ const adminApp = {
   selectGalleryImg(url) {
     const urlEl = document.getElementById('pg-bg-url');
     if (urlEl) { urlEl.value = url; this.previewBgUrl(url); }
+  },
+
+  async deleteBgImage(filename, btn) {
+    if (!confirm('Supprimer cette image ?')) return;
+    try {
+      await apiFetch(`/api/v1/upload?file=${encodeURIComponent(filename)}`, null, 'DELETE');
+      // Retirer le bloc parent du DOM
+      btn.closest('.relative')?.remove();
+      // Si l'URL supprimée est l'URL courante dans le champ, vider le champ
+      const urlEl = document.getElementById('pg-bg-url');
+      if (urlEl && urlEl.value.endsWith(filename)) {
+        urlEl.value = '';
+        document.getElementById('bg-preview').style.backgroundImage = '';
+      }
+      showToast('Image supprimée');
+    } catch {
+      showToast('Erreur suppression', 'error');
+    }
   },
 
   previewAccent(hex) {
