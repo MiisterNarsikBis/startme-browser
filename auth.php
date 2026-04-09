@@ -180,7 +180,7 @@ async function doLogin() {
     return;
   }
 
-  const res = await fetch('<?= BASE_URL ?>/api/auth.php?action=login', {
+  const res = await fetch('<?= BASE_URL ?>/api/v1/auth/login', {
     method: 'POST',
     headers: {'Content-Type': 'application/json'},
     body: JSON.stringify({ words })
@@ -196,7 +196,7 @@ async function doLogin() {
 }
 
 async function generateSeed() {
-  const res  = await fetch('<?= BASE_URL ?>/api/auth.php?action=generate', { method: 'POST' });
+  const res  = await fetch('<?= BASE_URL ?>/api/v1/auth/generate', { method: 'POST' });
   const data = await res.json();
   generatedWords = data.words;
 
@@ -231,7 +231,7 @@ async function doCreate() {
   const err = document.getElementById('create-error');
   err.classList.add('hidden');
 
-  const res = await fetch('<?= BASE_URL ?>/api/auth.php?action=login', {
+  const res = await fetch('<?= BASE_URL ?>/api/v1/auth/login', {
     method: 'POST',
     headers: {'Content-Type': 'application/json'},
     body: JSON.stringify({ words: generatedWords })
