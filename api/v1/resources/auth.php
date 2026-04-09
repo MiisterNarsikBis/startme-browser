@@ -12,10 +12,13 @@ define('AUTH_RL_MAX',     10);
 define('AUTH_RL_MINUTES', 15);
 
 function auth_get_ip(): string {
-    foreach (['HTTP_CF_CONNECTING_IP','HTTP_X_FORWARDED_FOR','REMOTE_ADDR'] as $k) {
-        if (!empty($_SERVER[$k])) return trim(explode(',', $_SERVER[$k])[0]);
+    // HTTP_CF_CONNECTING_IP est fiable (injecté par Cloudflare, non falsifiable par le client).
+    // HTTP_X_FORWARDED_FOR est omis : falsifiable par n'importe quel client, permettrait
+    // de bypasser le rate limiting en changeant ce header à chaque requête.
+    if (!empty($_SERVER['HTTP_CF_CONNECTING_IP'])) {
+        return trim($_SERVER['HTTP_CF_CONNECTING_IP']);
     }
-    return '0.0.0.0';
+    return $_SERVER['REMOTE_ADDR'] ?? '0.0.0.0';
 }
 
 function auth_check_rl(): void {

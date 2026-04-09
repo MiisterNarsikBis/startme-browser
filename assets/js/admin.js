@@ -18,6 +18,7 @@ const adminApp = {
     document.querySelectorAll('.modal-panel').forEach(el => el.classList.add('hidden'));
     const panel = document.getElementById('modal-' + name);
     if (panel) panel.classList.remove('hidden');
+    if (name === 'themes') this.renderThemes();
   },
 
   closeModal(e) {
@@ -41,10 +42,15 @@ const adminApp = {
       clock:     { title: 'Horloge',   config: {},                                    w: 2, h: 16 },
       embed:     { title: 'Contenu',   config: { url: '' },                           w: 4, h: 40 },
       calendar:  { title: 'Calendrier',config: { ical_url: '' },                       w: 3, h: 24 },
-      image:     { title: 'Image',     config: { url: '', fit: 'cover', caption: '' }, w: 3, h: 30 },
+      image:     { title: 'Image',     config: { url: '', fit: 'cover', caption: '' },                          w: 3, h: 30 },
+      pomodoro:  { title: 'Pomodoro',  config: { work_minutes: 25, break_minutes: 5, long_break_minutes: 15, long_break_every: 4 }, w: 2, h: 28 },
+      github:    { title: 'GitHub',    config: { username: '', platform: 'github' },                            w: 3, h: 36 },
     };
 
     const def = defaults[type] || { title: type, config: {}, w: 3, h: 4 };
+
+    // Trouver la position Y la plus basse pour éviter de décaler les widgets existants
+    const bottomY = grid.engine.nodes.reduce((max, n) => Math.max(max, n.y + n.h), 0);
 
     try {
       const res = await apiFetch('/api/v1/widgets', {
@@ -53,7 +59,7 @@ const adminApp = {
         title:   def.title,
         config:  def.config,
         grid_x:  0,
-        grid_y:  0,
+        grid_y:  bottomY,
         grid_w:  def.w,
         grid_h:  def.h,
       });
@@ -70,7 +76,11 @@ const adminApp = {
             <span class="text-xs text-white/40">⠿</span>
             <span class="font-semibold text-sm text-white/90 flex-1">${escHtml(def.title)}</span>
             <span class="text-xs text-white/40 bg-white/10 px-2 py-0.5 rounded-full">${type}</span>
-            <button onclick="adminApp.editWidget(${res.id},'${type}',${JSON.stringify(def.config).replace(/"/g,'&quot;')},'${escHtml(def.title)}')"
+            <button onclick="adminApp.editWidgetFromEl(this)"
+              data-widget-id="${res.id}"
+              data-widget-type="${escHtml(type)}"
+              data-widget-config="${escHtml(JSON.stringify(def.config))}"
+              data-widget-title="${escHtml(def.title)}"
               class="p-1.5 rounded-lg hover:bg-white/20 text-white/50 hover:text-white transition text-xs">⚙️</button>
             <button onclick="adminApp.deleteWidget(${res.id})"
               class="p-1.5 rounded-lg hover:bg-red-500/30 text-white/30 hover:text-red-400 transition text-xs">✕</button>
@@ -84,7 +94,7 @@ const adminApp = {
         </div>`;
 
       grid.addWidget({
-        w: def.w, h: def.h, x: 0, y: 0,
+        w: def.w, h: def.h, x: 0, y: bottomY,
         id: String(res.id),
         content,
       });
@@ -98,6 +108,14 @@ const adminApp = {
   // ----------------------------------------------------------
   // WIDGETS — Édition paramètres
   // ----------------------------------------------------------
+  editWidgetFromEl(btn) {
+    const id     = parseInt(btn.dataset.widgetId, 10);
+    const type   = btn.dataset.widgetType;
+    const config = JSON.parse(btn.dataset.widgetConfig || '{}');
+    const title  = btn.dataset.widgetTitle || '';
+    this.editWidget(id, type, config, title);
+  },
+
   editWidget(id, type, config, title) {
     this.currentWidgetId   = id;
     this.currentWidgetType = type;
@@ -253,6 +271,51 @@ const adminApp = {
             </div>
           </div>`;
         break;
+
+      case 'pomodoro':
+        html += `
+          <div class="grid grid-cols-2 gap-3">
+            <div>
+              <label class="text-sm text-white/60 block mb-1">Travail (min)</label>
+              <input id="wf-pomo-work" type="number" value="${config.work_minutes||25}" min="1" max="120"
+                class="form-input w-full">
+            </div>
+            <div>
+              <label class="text-sm text-white/60 block mb-1">Pause courte (min)</label>
+              <input id="wf-pomo-short" type="number" value="${config.break_minutes||5}" min="1" max="60"
+                class="form-input w-full">
+            </div>
+            <div>
+              <label class="text-sm text-white/60 block mb-1">Pause longue (min)</label>
+              <input id="wf-pomo-long" type="number" value="${config.long_break_minutes||15}" min="1" max="120"
+                class="form-input w-full">
+            </div>
+            <div>
+              <label class="text-sm text-white/60 block mb-1">Sessions avant longue pause</label>
+              <input id="wf-pomo-every" type="number" value="${config.long_break_every||4}" min="1" max="10"
+                class="form-input w-full">
+            </div>
+          </div>`;
+        break;
+
+      case 'github':
+        html += `
+          <div class="space-y-3">
+            <div>
+              <label class="text-sm text-white/60 block mb-1">Plateforme</label>
+              <select id="wf-gh-platform" class="form-input w-full">
+                <option value="github"  ${(config.platform||'github')==='github' ?'selected':''}>🐙 GitHub</option>
+                <option value="gitlab"  ${config.platform==='gitlab' ?'selected':''}>🦊 GitLab</option>
+              </select>
+            </div>
+            <div>
+              <label class="text-sm text-white/60 block mb-1">Nom d'utilisateur</label>
+              <input id="wf-gh-username" type="text" value="${escHtml(config.username||'')}"
+                class="form-input w-full" placeholder="octocat">
+              <p class="text-xs text-white/30 mt-1">Profil public uniquement. Pas de token requis.</p>
+            </div>
+          </div>`;
+        break;
     }
 
     return html;
@@ -373,9 +436,20 @@ const adminApp = {
         config.fit     = document.getElementById('wf-img-fit')?.value;
         config.caption = document.getElementById('wf-img-caption')?.value;
         break;
+      case 'pomodoro':
+        config.work_minutes       = parseInt(document.getElementById('wf-pomo-work')?.value  || 25);
+        config.break_minutes      = parseInt(document.getElementById('wf-pomo-short')?.value || 5);
+        config.long_break_minutes = parseInt(document.getElementById('wf-pomo-long')?.value  || 15);
+        config.long_break_every   = parseInt(document.getElementById('wf-pomo-every')?.value || 4);
+        break;
+      case 'github':
+        config.username = document.getElementById('wf-gh-username')?.value.trim();
+        config.platform = document.getElementById('wf-gh-platform')?.value;
+        break;
     }
 
     await apiFetch(`/api/v1/widgets/${id}`, { title, config }, 'PUT');
+    showToast('Widget mis à jour');
 
     // Mettre à jour le titre dans la grille
     const header = document.querySelector(`[data-widget-id="${id}"] .widget-header .font-semibold`);
@@ -477,7 +551,93 @@ const adminApp = {
       ? `url(${bgValue}) center/cover no-repeat fixed`
       : bgValue;
 
+    showToast('Page sauvegardée');
     this.closeModal({target: document.getElementById('modal-overlay')});
+  },
+
+  // ----------------------------------------------------------
+  // THÈMES
+  // ----------------------------------------------------------
+  _themes: [
+    { name: 'Nuit indigo',    bg_type: 'gradient', bg_value: 'linear-gradient(135deg,#0f172a 0%,#1e1b4b 100%)' },
+    { name: 'Obsidienne',     bg_type: 'gradient', bg_value: 'linear-gradient(135deg,#0c0a09 0%,#292524 100%)' },
+    { name: 'Forêt',          bg_type: 'gradient', bg_value: 'linear-gradient(135deg,#042f2e 0%,#134e4a 100%)' },
+    { name: 'Cosmos',         bg_type: 'gradient', bg_value: 'linear-gradient(135deg,#1e1b4b 0%,#4c1d95 100%)' },
+    { name: 'Océan',          bg_type: 'gradient', bg_value: 'linear-gradient(135deg,#172554 0%,#0c4a6e 100%)' },
+    { name: 'Braise',         bg_type: 'gradient', bg_value: 'linear-gradient(135deg,#431407 0%,#9a3412 100%)' },
+    { name: 'Rose sombre',    bg_type: 'gradient', bg_value: 'linear-gradient(135deg,#1a0a1e 0%,#5b0f4e 100%)' },
+    { name: 'Aurore boréale', bg_type: 'gradient', bg_value: 'linear-gradient(135deg,#042f2e 0%,#1e1b4b 50%,#0f172a 100%)' },
+    { name: 'Cyberpunk',      bg_type: 'gradient', bg_value: 'linear-gradient(135deg,#050c18 0%,#0d2137 50%,#04101f 100%)' },
+    { name: 'Café',           bg_type: 'gradient', bg_value: 'linear-gradient(135deg,#1c1008 0%,#3b2005 100%)' },
+    { name: 'Ardoise',        bg_type: 'color',    bg_value: '#0f172a' },
+    { name: 'Minuit',         bg_type: 'color',    bg_value: '#050507' },
+  ],
+
+  renderThemes() {
+    const grid = document.getElementById('themes-grid');
+    if (!grid) return;
+    grid.innerHTML = this._themes.map((t, i) => `
+      <button type="button" onclick="adminApp.applyTheme(${i})"
+        class="group relative h-20 rounded-xl overflow-hidden border-2 border-white/10 hover:border-brand/60 transition-all hover:scale-105"
+        style="background:${escHtml(t.bg_value)};"
+        title="${escHtml(t.name)}">
+        <div class="absolute inset-0 bg-black/0 group-hover:bg-black/20 transition-all"></div>
+        <span class="absolute bottom-1.5 left-0 right-0 text-center text-[11px] font-medium text-white/80
+                     drop-shadow-[0_1px_2px_rgba(0,0,0,0.9)]">
+          ${escHtml(t.name)}
+        </span>
+      </button>`).join('');
+  },
+
+  async applyTheme(index) {
+    const t = this._themes[index];
+    if (!t) return;
+    await apiFetch(`/api/v1/pages/${PAGE_ID}`, {
+      bg_type: t.bg_type, bg_value: t.bg_value,
+    }, 'PUT');
+    document.body.style.background = t.bg_type === 'image'
+      ? `url(${t.bg_value}) center/cover no-repeat fixed`
+      : t.bg_value;
+    showToast('Thème "' + t.name + '" appliqué');
+    this.closeModal({ target: document.getElementById('modal-overlay') });
+  },
+
+  // ----------------------------------------------------------
+  // SAUVEGARDE / RESTAURATION
+  // ----------------------------------------------------------
+  async exportBackup() {
+    const data = await apiFetch('/api/v1/backup', null, 'GET');
+    const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
+    const url  = URL.createObjectURL(blob);
+    const a    = document.createElement('a');
+    const date = new Date().toISOString().slice(0, 10);
+    a.href     = url;
+    a.download = `startme-backup-${date}.json`;
+    a.click();
+    URL.revokeObjectURL(url);
+  },
+
+  async importBackup(input) {
+    const file = input.files[0];
+    if (!file) return;
+
+    const status = document.getElementById('import-status');
+    status.className = 'text-sm text-center py-2 rounded-xl bg-white/5 text-white/60';
+    status.textContent = '⏳ Importation en cours…';
+    status.classList.remove('hidden');
+
+    try {
+      const text = await file.text();
+      const data = JSON.parse(text);
+      await apiFetch('/api/v1/backup', data, 'POST');
+      status.className = 'text-sm text-center py-2 rounded-xl bg-green-500/20 text-green-400';
+      status.textContent = '✅ Import réussi ! Redirection…';
+      setTimeout(() => { window.location.href = BASE_URL + '/'; }, 1200);
+    } catch (e) {
+      status.className = 'text-sm text-center py-2 rounded-xl bg-red-500/20 text-red-400';
+      status.textContent = '❌ ' + (e.message || 'Erreur lors de l\'import.');
+      input.value = '';
+    }
   },
 
   async deletePage(pageId) {

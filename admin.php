@@ -104,6 +104,18 @@ tailwind.config = {
     🎨 Page
   </button>
 
+  <button onclick="adminApp.showModal('themes')"
+    class="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-sm text-white/50 hover:text-white hover:bg-white/10 transition"
+    title="Thèmes">
+    🎨 Thèmes
+  </button>
+
+  <button onclick="adminApp.showModal('backup')"
+    class="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-sm text-white/50 hover:text-white hover:bg-white/10 transition"
+    title="Sauvegarde & Restauration">
+    📦
+  </button>
+
   <a href="<?= BASE_URL ?>/p/<?= htmlspecialchars($slug) ?>"
     class="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-sm text-white/50 hover:text-white hover:bg-white/10 transition">
     👁️ Voir
@@ -129,7 +141,11 @@ tailwind.config = {
             <span class="text-xs text-white/40">⠿</span>
             <span class="font-semibold text-sm text-white/90 flex-1"><?= htmlspecialchars($w['title'] ?? '') ?></span>
             <span class="text-xs text-white/40 bg-white/10 px-2 py-0.5 rounded-full"><?= $w['type'] ?></span>
-            <button onclick="adminApp.editWidget(<?= $w['id'] ?>, '<?= $w['type'] ?>', <?= htmlspecialchars(json_encode(json_decode($w['config_json'] ?? '{}'), JSON_UNESCAPED_UNICODE), ENT_QUOTES) ?>, '<?= htmlspecialchars($w['title'] ?? '') ?>')"
+            <button onclick="adminApp.editWidgetFromEl(this)"
+              data-widget-id="<?= $w['id'] ?>"
+              data-widget-type="<?= htmlspecialchars($w['type'], ENT_QUOTES) ?>"
+              data-widget-config="<?= htmlspecialchars($w['config_json'] ?? '{}', ENT_QUOTES) ?>"
+              data-widget-title="<?= htmlspecialchars($w['title'] ?? '', ENT_QUOTES) ?>"
               class="p-1.5 rounded-lg hover:bg-white/20 text-white/50 hover:text-white transition text-xs">⚙️</button>
             <button onclick="adminApp.deleteWidget(<?= $w['id'] ?>)"
               class="p-1.5 rounded-lg hover:bg-red-500/30 text-white/30 hover:text-red-400 transition text-xs">✕</button>
@@ -181,6 +197,8 @@ tailwind.config = {
           'embed'     => ['🖼️', 'Embed'],
           'calendar'  => ['📅', 'Calendrier'],
           'image'     => ['🌄', 'Image'],
+          'pomodoro'  => ['🍅', 'Pomodoro'],
+          'github'    => ['🐙', 'GitHub/Lab'],
         ];
         foreach ($widgetTypes as $type => [$icon, $label]):
         ?>
@@ -309,6 +327,56 @@ tailwind.config = {
         class="w-full bg-brand hover:bg-brand-dark py-2.5 rounded-xl font-medium transition">
         Créer →
       </button>
+    </div>
+  </div>
+
+  <!-- Modal Thèmes -->
+  <div id="modal-themes" class="modal-panel hidden w-full max-w-lg">
+    <div class="glass-dark rounded-2xl p-6">
+      <div class="flex items-center justify-between mb-5">
+        <h2 class="text-lg font-bold">🎨 Thèmes</h2>
+        <button onclick="adminApp.closeModal()" class="text-white/40 hover:text-white">✕</button>
+      </div>
+      <p class="text-sm text-white/40 mb-4">Cliquez sur un thème pour l'appliquer immédiatement à cette page.</p>
+      <div id="themes-grid" class="grid grid-cols-3 gap-3"></div>
+    </div>
+  </div>
+
+  <!-- Modal Sauvegarde -->
+  <div id="modal-backup" class="modal-panel hidden w-full max-w-md">
+    <div class="glass-dark rounded-2xl p-6">
+      <div class="flex items-center justify-between mb-5">
+        <h2 class="text-lg font-bold">📦 Sauvegarde</h2>
+        <button onclick="adminApp.closeModal()" class="text-white/40 hover:text-white">✕</button>
+      </div>
+
+      <!-- Export -->
+      <div class="mb-6">
+        <h3 class="text-sm font-semibold text-white/80 mb-1">📤 Exporter</h3>
+        <p class="text-xs text-white/40 mb-3">Télécharge toutes vos pages, widgets et favoris dans un fichier JSON.</p>
+        <button onclick="adminApp.exportBackup()"
+          class="w-full py-2.5 rounded-xl bg-brand/30 hover:bg-brand/50 border border-brand/40 text-brand text-sm font-medium transition">
+          Télécharger le backup JSON
+        </button>
+      </div>
+
+      <div class="border-t border-white/10 mb-6"></div>
+
+      <!-- Import -->
+      <div>
+        <h3 class="text-sm font-semibold text-white/80 mb-1">📥 Importer</h3>
+        <p class="text-xs text-white/40 mb-3">
+          Choisissez un fichier de sauvegarde exporté depuis Startme.<br>
+          <span class="text-red-400/80">⚠️ Toutes vos pages actuelles seront remplacées.</span>
+        </p>
+        <label class="block w-full py-3 text-center rounded-xl border-2 border-dashed border-white/20
+                      hover:border-brand/50 cursor-pointer transition text-sm text-white/50 hover:text-white mb-3">
+          📁 Choisir un fichier .json
+          <input type="file" accept=".json,application/json" class="hidden"
+                 onchange="adminApp.importBackup(this)">
+        </label>
+        <div id="import-status" class="hidden text-sm text-center py-2 rounded-xl"></div>
+      </div>
     </div>
   </div>
 
