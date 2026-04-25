@@ -1069,6 +1069,8 @@ function timeAgo(iso) {
 // Auth
 // ----------------------------------------------------------------
 async function logout() {
+  const ok = confirm('Vous allez vous déconnecter.\nVous devrez ressaisir votre phrase secrète (12 mots) pour vous reconnecter.\n\nContinuer ?');
+  if (!ok) return;
   await apiFetch('/api/v1/auth/logout', {});
   window.location.href = BASE_URL + '/auth.php';
 }
