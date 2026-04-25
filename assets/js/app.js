@@ -72,6 +72,14 @@ function initGrid(editMode) {
     initGithubWidget(wid, cfg);
   });
 
+  // Auto-refresh iframes embed
+  document.querySelectorAll('[data-widget-type="embed"] iframe[data-refresh]').forEach(iframe => {
+    const seconds = parseInt(iframe.dataset.refresh, 10);
+    if (seconds > 0) {
+      setInterval(() => { iframe.src = iframe.src; }, seconds * 1000);
+    }
+  });
+
   // Drag & drop bookmarks
   initBookmarksSortable();
 }
