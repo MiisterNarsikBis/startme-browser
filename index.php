@@ -409,13 +409,16 @@ function renderClock(): void {
 }
 
 function renderEmbed(array $config): void {
-    $url = htmlspecialchars($config['url'] ?? '');
+    $url     = htmlspecialchars($config['url'] ?? '');
+    $refresh = (int)($config['refresh'] ?? 0);
     if (!$url) {
         echo '<p class="text-white/40 text-sm text-center py-4">URL non configurée.</p>';
         return;
     }
-    echo '<iframe src="' . $url . '" class="w-full h-full rounded-lg border-0" loading="lazy"
-                  sandbox="allow-scripts allow-same-origin allow-forms allow-popups"></iframe>';
+    $refreshAttr = $refresh > 0 ? ' data-refresh="' . $refresh . '"' : '';
+    echo '<iframe src="' . $url . '" class="w-full h-full rounded-lg border-0" loading="lazy"'
+       . $refreshAttr
+       . ' sandbox="allow-scripts allow-same-origin allow-forms allow-popups"></iframe>';
 }
 
 function renderCalendar(array $config): void {

@@ -235,11 +235,24 @@ const adminApp = {
 
       case 'embed':
         html += `
-          <div>
-            <label class="text-sm text-white/60 block mb-1">URL à intégrer</label>
-            <input id="wf-embed-url" type="url" value="${escHtml(config.url||'')}"
-              class="form-input w-full" placeholder="https://…">
-            <p class="text-xs text-white/30 mt-1">Note : certains sites bloquent l'intégration en iframe.</p>
+          <div class="flex flex-col gap-3">
+            <div>
+              <label class="text-sm text-white/60 block mb-1">URL à intégrer</label>
+              <input id="wf-embed-url" type="url" value="${escHtml(config.url||'')}"
+                class="form-input w-full" placeholder="https://…">
+              <p class="text-xs text-white/30 mt-1">Note : certains sites bloquent l'intégration en iframe.</p>
+            </div>
+            <div>
+              <label class="text-sm text-white/60 block mb-1">Rafraîchissement automatique</label>
+              <select id="wf-embed-refresh" class="form-input w-full">
+                <option value="0"  ${(config.refresh||0)==0   ?'selected':''}>Désactivé</option>
+                <option value="30" ${(config.refresh||0)==30  ?'selected':''}>Toutes les 30 s</option>
+                <option value="60" ${(config.refresh||0)==60  ?'selected':''}>Toutes les minutes</option>
+                <option value="300"  ${(config.refresh||0)==300  ?'selected':''}>Toutes les 5 min</option>
+                <option value="900"  ${(config.refresh||0)==900  ?'selected':''}>Toutes les 15 min</option>
+                <option value="1800" ${(config.refresh||0)==1800 ?'selected':''}>Toutes les 30 min</option>
+              </select>
+            </div>
           </div>`;
         break;
 
@@ -489,7 +502,8 @@ const adminApp = {
         config.city = document.getElementById('wf-city')?.value;
         break;
       case 'embed':
-        config.url = document.getElementById('wf-embed-url')?.value;
+        config.url     = document.getElementById('wf-embed-url')?.value;
+        config.refresh = parseInt(document.getElementById('wf-embed-refresh')?.value || '0', 10);
         break;
       case 'calendar':
         config.ical_url = document.getElementById('wf-ical')?.value;
