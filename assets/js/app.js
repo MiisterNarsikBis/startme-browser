@@ -570,7 +570,9 @@ function initPomodoro(widgetId, cfg) {
           }
           remaining = durations()[state];
           running = false;
-          showToast(modeLabels()[state] + ' (terminé pendant ton absence)', 'info');
+          const absentLabel = modeLabels()[state] + ' (terminé pendant ton absence)';
+          showToast(absentLabel, 'info');
+          pomodoroNotif(absentLabel);
         } else {
           // Phase encore en cours → reprendre automatiquement
           running = true;
@@ -607,6 +609,12 @@ function initPomodoro(widgetId, cfg) {
                           state === 'short-break' ? '#34d399' : '#60a5fa';
   }
 
+  function pomodoroNotif(msg) {
+    if ('Notification' in window && Notification.permission === 'granted') {
+      new Notification('Pomodoro', { body: msg, icon: BASE_URL + '/assets/img/icon-192.png' });
+    }
+  }
+
   function nextPhase() {
     clearInterval(interval);
     running = false;
@@ -619,7 +627,9 @@ function initPomodoro(widgetId, cfg) {
     remaining = durations()[state];
     render();
     saveState();
-    showToast(modeLabels()[state] + ' !', 'info');
+    const label = modeLabels()[state];
+    showToast(label + ' !', 'info');
+    pomodoroNotif(label + ' !');
   }
 
   btnToggle.addEventListener('click', () => {
@@ -627,6 +637,9 @@ function initPomodoro(widgetId, cfg) {
       clearInterval(interval);
       running = false;
     } else {
+      if ('Notification' in window && Notification.permission === 'default') {
+        Notification.requestPermission();
+      }
       running = true;
       interval = setInterval(() => {
         if (remaining <= 0) { nextPhase(); return; }
