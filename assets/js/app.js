@@ -684,6 +684,8 @@ function initCountdown(widgetId, cfg) {
   const doneEl  = root.querySelector('.countdown-done');
   const dispEl  = root.querySelector('.countdown-display');
 
+  let timer;
+
   function update() {
     const diff = target - Date.now();
     if (diff <= 0) {
@@ -703,7 +705,7 @@ function initCountdown(widgetId, cfg) {
   }
 
   update();
-  const timer = setInterval(update, 1000);
+  timer = setInterval(update, 1000);
 }
 
 // ----------------------------------------------------------------
