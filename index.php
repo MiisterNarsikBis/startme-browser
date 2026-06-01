@@ -572,16 +572,25 @@ function renderImage(array $config): void {
 }
 
 function renderJson(int $id, array $config): void {
-    $url = $config['url'] ?? '';
-    if (!$url) {
-        echo '<p class="text-white/40 text-sm text-center py-4">URL JSON non configurée.</p>';
+    // Rétrocompatibilité : ancien format { url, display_fields }
+    if (!isset($config['sources']) && isset($config['url'])) {
+        $config = [
+            'sources'       => [['name' => '', 'url' => $config['url'], 'display_fields' => $config['display_fields'] ?? []]],
+            'cache_minutes' => $config['cache_minutes'] ?? 5,
+        ];
+    }
+
+    $sources = $config['sources'] ?? [];
+    if (empty($sources)) {
+        echo '<p class="text-white/40 text-sm text-center py-4">Aucune source JSON configurée.</p>';
         return;
     }
+
     $cfg = htmlspecialchars(json_encode([
-        'url'            => $url,
-        'cache_minutes'  => (int)($config['cache_minutes'] ?? 5),
-        'display_fields' => $config['display_fields'] ?? [],
+        'sources'       => $sources,
+        'cache_minutes' => (int)($config['cache_minutes'] ?? 5),
     ]), ENT_QUOTES);
+
     echo '<div class="json-widget-container h-full overflow-auto"
                data-widget-id="' . $id . '"
                data-json-config="' . $cfg . '">

@@ -395,39 +395,63 @@ const adminApp = {
         break;
 
       case 'json': {
+        // Normaliser l'ancien format mono-URL
+        let jsonSources = config.sources || [];
+        if (!jsonSources.length && config.url) {
+          jsonSources = [{ name: '', url: config.url, display_fields: config.display_fields || [] }];
+        }
+        const cm = config.cache_minutes ?? 5;
         html += `
           <div class="space-y-3">
             <div>
-              <label class="text-sm text-white/60 block mb-1">URL de l'API JSON</label>
-              <div class="flex gap-2">
-                <input id="wf-json-url" type="url" value="${escHtml(config.url||'')}"
-                  class="form-input flex-1" placeholder="https://api.example.com/data.json">
-                <button type="button" onclick="adminApp.previewJson()"
-                  class="px-3 py-1.5 rounded-lg bg-brand/30 text-brand text-sm hover:bg-brand/50 transition whitespace-nowrap">
-                  Tester
-                </button>
-              </div>
-            </div>
-            <div>
-              <label class="text-sm text-white/60 block mb-1">Cache</label>
+              <label class="text-sm text-white/60 block mb-1">Cache (toutes les sources)</label>
               <select id="wf-json-cache" class="form-input w-full">
-                <option value="0"    ${(config.cache_minutes??5)==0    ?'selected':''}>Pas de cache</option>
-                <option value="1"    ${(config.cache_minutes??5)==1    ?'selected':''}>1 minute</option>
-                <option value="5"    ${(config.cache_minutes??5)==5    ?'selected':''}>5 minutes (recommandé)</option>
-                <option value="15"   ${(config.cache_minutes??5)==15   ?'selected':''}>15 minutes</option>
-                <option value="60"   ${(config.cache_minutes??5)==60   ?'selected':''}>1 heure</option>
-                <option value="1440" ${(config.cache_minutes??5)==1440 ?'selected':''}>24 heures</option>
+                <option value="0"    ${cm==0    ?'selected':''}>Pas de cache</option>
+                <option value="1"    ${cm==1    ?'selected':''}>1 minute</option>
+                <option value="5"    ${cm==5    ?'selected':''}>5 minutes (recommandé)</option>
+                <option value="15"   ${cm==15   ?'selected':''}>15 minutes</option>
+                <option value="60"   ${cm==60   ?'selected':''}>1 heure</option>
+                <option value="1440" ${cm==1440 ?'selected':''}>24 heures</option>
               </select>
             </div>
             <div>
               <div class="flex items-center justify-between mb-2">
-                <label class="text-sm text-white/60">Champs à afficher</label>
-                <span id="json-fields-hint" class="text-xs text-white/30">Cliquez "Tester" pour choisir</span>
+                <label class="text-sm text-white/60">Sources JSON</label>
+                <button type="button" onclick="adminApp.jsonAddSource()"
+                  class="text-xs bg-brand/30 text-brand px-2 py-1 rounded-lg hover:bg-brand/50 transition">
+                  + Ajouter
+                </button>
               </div>
-              <div id="json-fields-area" class="space-y-1 max-h-60 overflow-y-auto"></div>
+              <div id="json-sources-list" class="space-y-1 mb-2"></div>
+              <div id="json-source-form" class="hidden space-y-2 p-3 bg-white/5 rounded-xl">
+                <input id="json-src-name" type="text" placeholder="Nom de la source (optionnel)"
+                  class="form-input w-full text-sm">
+                <div class="flex gap-2">
+                  <input id="json-src-url" type="url" placeholder="https://api.example.com/data.json"
+                    class="form-input flex-1 text-sm">
+                  <button type="button" onclick="adminApp.jsonTestSource()"
+                    class="px-3 py-1.5 rounded-lg bg-brand/30 text-brand text-sm hover:bg-brand/50 transition whitespace-nowrap">
+                    Tester
+                  </button>
+                </div>
+                <div id="json-src-fields-wrap" class="hidden">
+                  <p id="json-src-fields-hint" class="text-xs text-white/40 mb-1"></p>
+                  <div id="json-src-fields-list" class="space-y-1 max-h-44 overflow-y-auto"></div>
+                </div>
+                <div class="flex gap-2 pt-1">
+                  <button type="button" onclick="adminApp.jsonSaveSource()"
+                    class="flex-1 bg-brand/40 hover:bg-brand/60 py-1.5 rounded-lg text-sm transition">
+                    Valider
+                  </button>
+                  <button type="button" onclick="adminApp.jsonCancelSource()"
+                    class="px-4 py-1.5 rounded-lg bg-white/10 hover:bg-white/20 text-sm transition">
+                    Annuler
+                  </button>
+                </div>
+              </div>
             </div>
           </div>`;
-        setTimeout(() => adminApp.initJsonFields(config.display_fields || []), 30);
+        setTimeout(() => adminApp.initJsonSources(jsonSources), 30);
         break;
       }
     }
@@ -578,9 +602,11 @@ const adminApp = {
         break;
       }
       case 'json':
-        config.url            = document.getElementById('wf-json-url')?.value.trim();
-        config.cache_minutes  = parseInt(document.getElementById('wf-json-cache')?.value || '5', 10);
-        config.display_fields = this._jsonFields.filter(f => f.path);
+        config.sources       = this._jsonSources;
+        config.cache_minutes = parseInt(document.getElementById('wf-json-cache')?.value || '5', 10);
+        // Nettoyer l'ancien format mono-URL
+        delete config.url;
+        delete config.display_fields;
         break;
     }
 
@@ -900,108 +926,197 @@ const adminApp = {
   },
 
   // ----------------------------------------------------------
-  // JSON Widget — Sélection des champs
+  // JSON Widget — Gestion multi-sources
   // ----------------------------------------------------------
-  _jsonFields: [],
-  _jsonPreviewFields: null,
+  _jsonSources: [],
+  _jsonEditIdx: null,        // null = nouvelle source, nombre = édition
+  _jsonEditFields: [],       // champs sélectionnés pour la source en cours d'édition
+  _jsonEditPreview: null,    // champs disponibles après test
 
-  initJsonFields(fields) {
-    this._jsonFields       = fields.map(f => ({ ...f }));
-    this._jsonPreviewFields = null;
-    this._renderJsonFieldsArea();
+  initJsonSources(sources) {
+    this._jsonSources  = sources.map(s => ({ ...s, display_fields: (s.display_fields || []).map(f => ({ ...f })) }));
+    this._jsonEditIdx  = null;
+    this._jsonEditFields  = [];
+    this._jsonEditPreview = null;
+    this._renderJsonSourcesList();
   },
 
-  _renderJsonFieldsArea() {
-    const area = document.getElementById('json-fields-area');
-    if (!area) return;
-
-    // Mode "picker" : après un test d'URL — affiche les cases à cocher
-    if (this._jsonPreviewFields) {
-      if (!this._jsonPreviewFields.length) {
-        area.innerHTML = '<p class="text-white/30 text-xs py-2">Aucun champ trouvé dans ce JSON.</p>';
-        return;
-      }
-      area.innerHTML = this._jsonPreviewFields.map((f, i) => {
-        const existing = this._jsonFields.find(x => x.path === f.path);
-        const checked  = !!existing;
-        return `
-          <label class="flex items-center gap-2 p-2 bg-white/5 rounded-lg hover:bg-white/10 transition cursor-pointer">
-            <input type="checkbox" class="accent-indigo-500 w-4 h-4 flex-shrink-0" ${checked ? 'checked' : ''}
-                   data-path="${escHtml(f.path)}" data-idx="${i}"
-                   onchange="adminApp._toggleJsonField(this.dataset.path, this.checked, ${i})">
-            <span class="text-xs font-mono text-brand/70 flex-shrink-0" style="min-width:90px;max-width:90px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="${escHtml(f.path)}">${escHtml(f.path)}</span>
-            <span class="text-xs text-white/30 flex-1 truncate" title="${escHtml(String(f.sample))}">${escHtml(String(f.sample))}</span>
-            <input type="text" placeholder="Label…" value="${escHtml(existing?.label||'')}"
-                   class="form-input flex-shrink-0 text-xs py-1 ${checked ? '' : 'opacity-30'}"
-                   style="width:90px" id="json-label-${i}" ${checked ? '' : 'disabled'}
-                   oninput="adminApp._setJsonFieldLabel('${escHtml(f.path)}', this.value)">
-          </label>`;
-      }).join('') + `<p class="text-xs text-white/30 mt-2 px-1">Cochez les champs voulus et personnalisez les labels.</p>`;
+  _renderJsonSourcesList() {
+    const list = document.getElementById('json-sources-list');
+    if (!list) return;
+    if (!this._jsonSources.length) {
+      list.innerHTML = '<p class="text-xs text-white/30 py-1">Aucune source. Cliquez "+ Ajouter".</p>';
       return;
     }
-
-    // Mode "liste" : champs déjà configurés
-    if (!this._jsonFields.length) {
-      area.innerHTML = '<p class="text-white/30 text-xs py-1">Aucun champ — cliquez "Tester" pour choisir.</p>';
-      return;
-    }
-    area.innerHTML = this._jsonFields.map((f, i) => `
-      <div class="flex items-center gap-2 p-2 bg-white/5 rounded-lg">
-        <span class="text-xs font-mono text-brand/70 flex-shrink-0 truncate" style="min-width:80px;max-width:80px" title="${escHtml(f.path)}">${escHtml(f.path)}</span>
-        <input type="text" value="${escHtml(f.label||f.path)}" placeholder="Label…"
-               class="form-input flex-1 text-xs py-1"
-               oninput="adminApp._jsonFields[${i}].label=this.value">
-        <input type="text" value="${escHtml(f.unit||'')}" placeholder="unité"
-               class="form-input flex-shrink-0 text-xs py-1" style="width:56px"
-               oninput="adminApp._jsonFields[${i}].unit=this.value">
-        <button onclick="adminApp._removeJsonField(${i})"
-                class="text-white/30 hover:text-red-400 transition text-sm flex-shrink-0">✕</button>
+    list.innerHTML = this._jsonSources.map((s, i) => `
+      <div class="flex items-center gap-2 bg-white/5 rounded-lg px-3 py-2">
+        <div class="flex-1 min-w-0">
+          <div class="text-sm font-medium text-white/80 truncate">${escHtml(s.name || '(sans nom)')}</div>
+          <div class="text-xs text-white/30 truncate">${escHtml(s.url)} — ${s.display_fields?.length || 0} champ(s)</div>
+        </div>
+        <button onclick="adminApp.jsonEditSource(${i})"
+          class="p-1 rounded hover:bg-brand/30 text-white/40 hover:text-brand transition text-xs">✏</button>
+        <button onclick="adminApp.jsonRemoveSource(${i})"
+          class="p-1 rounded hover:bg-red-500/30 text-white/30 hover:text-red-400 transition text-xs">✕</button>
       </div>`).join('');
   },
 
-  _toggleJsonField(path, checked, previewIndex) {
-    if (checked) {
-      if (!this._jsonFields.find(f => f.path === path)) {
-        this._jsonFields.push({ path, label: '', unit: '' });
-      }
-      const lbl = document.getElementById(`json-label-${previewIndex}`);
-      if (lbl) { lbl.disabled = false; lbl.classList.remove('opacity-30'); }
-    } else {
-      this._jsonFields = this._jsonFields.filter(f => f.path !== path);
-      const lbl = document.getElementById(`json-label-${previewIndex}`);
-      if (lbl) { lbl.disabled = true; lbl.classList.add('opacity-30'); lbl.value = ''; }
+  jsonAddSource() {
+    this._jsonEditIdx     = null;
+    this._jsonEditFields  = [];
+    this._jsonEditPreview = null;
+    document.getElementById('json-src-name').value = '';
+    document.getElementById('json-src-url').value  = '';
+    document.getElementById('json-src-fields-wrap').classList.add('hidden');
+    document.getElementById('json-source-form').classList.remove('hidden');
+    document.getElementById('json-src-name').focus();
+  },
+
+  jsonEditSource(i) {
+    const s = this._jsonSources[i];
+    if (!s) return;
+    this._jsonEditIdx     = i;
+    this._jsonEditFields  = (s.display_fields || []).map(f => ({ ...f }));
+    this._jsonEditPreview = null;
+    document.getElementById('json-src-name').value = s.name || '';
+    document.getElementById('json-src-url').value  = s.url  || '';
+    document.getElementById('json-src-fields-wrap').classList.add('hidden');
+    document.getElementById('json-source-form').classList.remove('hidden');
+    // Afficher les champs déjà configurés
+    if (this._jsonEditFields.length) {
+      this._renderJsonSrcFieldsList();
+      document.getElementById('json-src-fields-wrap').classList.remove('hidden');
+      document.getElementById('json-src-fields-hint').textContent = 'Champs configurés (testez l\'URL pour modifier) :';
     }
   },
 
-  _setJsonFieldLabel(path, label) {
-    const field = this._jsonFields.find(f => f.path === path);
-    if (field) field.label = label;
+  jsonRemoveSource(i) {
+    this._jsonSources.splice(i, 1);
+    this._renderJsonSourcesList();
   },
 
-  _removeJsonField(i) {
-    this._jsonFields.splice(i, 1);
-    this._renderJsonFieldsArea();
+  jsonCancelSource() {
+    this._jsonEditIdx     = null;
+    this._jsonEditFields  = [];
+    this._jsonEditPreview = null;
+    document.getElementById('json-source-form').classList.add('hidden');
+    document.getElementById('json-src-fields-wrap').classList.add('hidden');
   },
 
-  async previewJson() {
-    const url = document.getElementById('wf-json-url')?.value.trim();
+  jsonSaveSource() {
+    const name = document.getElementById('json-src-name')?.value.trim();
+    const url  = document.getElementById('json-src-url')?.value.trim();
+    if (!url) { showToast('URL requise'); return; }
+
+    const source = { name, url, display_fields: this._jsonEditFields.filter(f => f.path) };
+
+    if (this._jsonEditIdx === null) {
+      this._jsonSources.push(source);
+    } else {
+      this._jsonSources[this._jsonEditIdx] = source;
+    }
+
+    this._renderJsonSourcesList();
+    this.jsonCancelSource();
+  },
+
+  async jsonTestSource() {
+    const url  = document.getElementById('json-src-url')?.value.trim();
+    const hint = document.getElementById('json-src-fields-hint');
+    const wrap = document.getElementById('json-src-fields-wrap');
     if (!url) { showToast('Entrez une URL d\'abord'); return; }
 
-    const hint = document.getElementById('json-fields-hint');
-    const area = document.getElementById('json-fields-area');
     if (hint) hint.textContent = '⏳ Chargement…';
-    if (area) area.innerHTML = '';
+    wrap.classList.remove('hidden');
+    document.getElementById('json-src-fields-list').innerHTML = '';
 
     try {
       const res = await apiFetch('/api/v1/json/preview', { url }, 'POST');
-      this._jsonPreviewFields = res.fields;
-      this._renderJsonFieldsArea();
-      if (hint) hint.textContent = `${res.fields.length} champ(s) disponible(s)`;
+      this._jsonEditPreview = res.fields;
+      this._renderJsonSrcFieldsPicker();
+      if (hint) hint.textContent = `${res.fields.length} champ(s) disponible(s) — cochez ceux à afficher :`;
     } catch(e) {
-      this._jsonPreviewFields = null;
-      if (hint) hint.textContent = 'Erreur';
-      if (area) area.innerHTML = `<p class="text-red-400/60 text-xs p-2">${escHtml(e.message)}</p>`;
+      this._jsonEditPreview = null;
+      if (hint) hint.textContent = 'Erreur lors du fetch';
+      document.getElementById('json-src-fields-list').innerHTML =
+        `<p class="text-red-400/60 text-xs p-1">${escHtml(e.message)}</p>`;
     }
+  },
+
+  _renderJsonSrcFieldsPicker() {
+    const list = document.getElementById('json-src-fields-list');
+    if (!list || !this._jsonEditPreview) return;
+    list.innerHTML = this._jsonEditPreview.map((f, i) => {
+      const existing = this._jsonEditFields.find(x => x.path === f.path);
+      const checked  = !!existing;
+      return `
+        <label class="flex items-center gap-2 p-1.5 bg-white/5 rounded-lg hover:bg-white/10 transition cursor-pointer">
+          <input type="checkbox" class="accent-indigo-500 w-4 h-4 flex-shrink-0" ${checked ? 'checked' : ''}
+                 onchange="adminApp._jsonToggleField('${escHtml(f.path)}', this.checked, ${i})">
+          <span class="text-xs font-mono text-brand/70 flex-shrink-0 truncate" style="max-width:100px" title="${escHtml(f.path)}">${escHtml(f.path)}</span>
+          <span class="text-xs text-white/30 flex-1 truncate" title="${escHtml(String(f.sample))}">${escHtml(String(f.sample))}</span>
+          <input type="text" placeholder="Label…" value="${escHtml(existing?.label||'')}"
+                 class="form-input flex-shrink-0 text-xs py-0.5 ${checked ? '' : 'opacity-30'}"
+                 style="width:80px" id="json-flbl-${i}" ${checked ? '' : 'disabled'}
+                 oninput="adminApp._jsonSetLabel('${escHtml(f.path)}', this.value)">
+          <input type="text" placeholder="unité" value="${escHtml(existing?.unit||'')}"
+                 class="form-input flex-shrink-0 text-xs py-0.5 ${checked ? '' : 'opacity-30'}"
+                 style="width:48px" id="json-funit-${i}" ${checked ? '' : 'disabled'}
+                 oninput="adminApp._jsonSetUnit('${escHtml(f.path)}', this.value)">
+        </label>`;
+    }).join('');
+  },
+
+  _renderJsonSrcFieldsList() {
+    const list = document.getElementById('json-src-fields-list');
+    if (!list) return;
+    if (!this._jsonEditFields.length) {
+      list.innerHTML = '<p class="text-white/30 text-xs py-1">Aucun champ sélectionné.</p>';
+      return;
+    }
+    list.innerHTML = this._jsonEditFields.map((f, i) => `
+      <div class="flex items-center gap-2 p-1.5 bg-white/5 rounded-lg">
+        <span class="text-xs font-mono text-brand/70 flex-shrink-0 truncate" style="max-width:90px" title="${escHtml(f.path)}">${escHtml(f.path)}</span>
+        <input type="text" value="${escHtml(f.label||f.path)}" placeholder="Label…"
+               class="form-input flex-1 text-xs py-0.5"
+               oninput="adminApp._jsonEditFields[${i}].label=this.value">
+        <input type="text" value="${escHtml(f.unit||'')}" placeholder="unité"
+               class="form-input flex-shrink-0 text-xs py-0.5" style="width:48px"
+               oninput="adminApp._jsonEditFields[${i}].unit=this.value">
+        <button onclick="adminApp._jsonRemoveField(${i})"
+                class="text-white/30 hover:text-red-400 transition text-xs flex-shrink-0">✕</button>
+      </div>`).join('');
+  },
+
+  _jsonToggleField(path, checked, previewIndex) {
+    if (checked) {
+      if (!this._jsonEditFields.find(f => f.path === path)) {
+        this._jsonEditFields.push({ path, label: '', unit: '' });
+      }
+      const lbl  = document.getElementById(`json-flbl-${previewIndex}`);
+      const unit = document.getElementById(`json-funit-${previewIndex}`);
+      [lbl, unit].forEach(el => { if (el) { el.disabled = false; el.classList.remove('opacity-30'); } });
+    } else {
+      this._jsonEditFields = this._jsonEditFields.filter(f => f.path !== path);
+      const lbl  = document.getElementById(`json-flbl-${previewIndex}`);
+      const unit = document.getElementById(`json-funit-${previewIndex}`);
+      [lbl, unit].forEach(el => { if (el) { el.disabled = true; el.classList.add('opacity-30'); el.value = ''; } });
+    }
+  },
+
+  _jsonSetLabel(path, label) {
+    const f = this._jsonEditFields.find(f => f.path === path);
+    if (f) f.label = label;
+  },
+
+  _jsonSetUnit(path, unit) {
+    const f = this._jsonEditFields.find(f => f.path === path);
+    if (f) f.unit = unit;
+  },
+
+  _jsonRemoveField(i) {
+    this._jsonEditFields.splice(i, 1);
+    this._renderJsonSrcFieldsList();
   },
 
   async deletePage(pageId) {
