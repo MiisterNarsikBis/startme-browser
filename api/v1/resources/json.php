@@ -1,6 +1,6 @@
 <?php
 /*
- * GET  /api/v1/json?widget_id=X   — Récupère les données JSON (avec cache)
+ * GET  /api/v1/json?widget_id=X   — Récupère toutes les sources JSON (avec cache par URL)
  * POST /api/v1/json/preview        — Prévisualise une URL (admin) pour choisir les champs
  */
 
@@ -13,18 +13,16 @@ if ($method === 'POST' && $sub === 'preview') {
         json_error('URL invalide ou manquante.');
     }
 
-    $ctx  = json_build_ctx();
-    $body = @file_get_contents($url, false, $ctx);
+    $body = @file_get_contents($url, false, json_build_ctx());
     if ($body === false) json_error('Impossible de récupérer l\'URL.');
 
     $data = json_decode($body, true);
     if ($data === null) json_error('La réponse n\'est pas un JSON valide.');
 
-    $fields = json_flatten($data);
-    json_response(['fields' => $fields]);
+    json_response(['fields' => json_flatten($data)]);
 }
 
-// ---- Fetch principal (avec cache) -------------------------------------------
+// ---- Fetch principal (avec cache par source) --------------------------------
 if ($method !== 'GET') json_error('Méthode non autorisée.', 405);
 header('Cache-Control: no-store');
 
@@ -38,50 +36,82 @@ $widget = db_fetch(
 );
 if (!$widget) json_error('Widget introuvable.', 404);
 
-$config        = json_decode($widget['config_json'], true) ?? [];
-$url           = trim($config['url'] ?? '');
+$config        = json_normalize_config(json_decode($widget['config_json'], true) ?? []);
+$sources       = $config['sources'] ?? [];
 $cache_minutes = max(0, (int)($config['cache_minutes'] ?? 5));
 
-if (!$url) json_error('URL non configurée.');
+if (empty($sources)) json_error('Aucune source configurée.');
 
-// Vérifier le cache
-if ($cache_minutes > 0) {
-    $cache = db_fetch(
-        'SELECT content_json, fetched_at FROM json_cache WHERE widget_id=?',
-        [$widget_id]
-    );
-    if ($cache && strtotime($cache['fetched_at']) > time() - ($cache_minutes * 60)) {
-        json_response([
-            'data'       => json_decode($cache['content_json'], true),
-            'cached_at'  => $cache['fetched_at'],
-            'from_cache' => true,
-        ]);
+$results = [];
+
+foreach ($sources as $source) {
+    $url = trim($source['url'] ?? '');
+    if (!$url) continue;
+
+    $url_hash = md5($url);
+    $data     = null;
+    $cached_at = null;
+
+    // Vérifier le cache
+    if ($cache_minutes > 0) {
+        $cache = db_fetch(
+            'SELECT content_json, fetched_at FROM json_cache WHERE widget_id=? AND url_hash=?',
+            [$widget_id, $url_hash]
+        );
+        if ($cache && strtotime($cache['fetched_at']) > time() - ($cache_minutes * 60)) {
+            $data      = json_decode($cache['content_json'], true);
+            $cached_at = $cache['fetched_at'];
+        }
     }
+
+    // Fetch si pas en cache
+    if ($data === null) {
+        $body = @file_get_contents($url, false, json_build_ctx());
+        if ($body === false) {
+            $results[] = ['name' => $source['name'] ?? '', 'error' => 'Impossible de récupérer l\'URL'];
+            continue;
+        }
+
+        $data = json_decode($body, true);
+        if ($data === null) {
+            $results[] = ['name' => $source['name'] ?? '', 'error' => 'Réponse JSON invalide'];
+            continue;
+        }
+
+        $encoded  = json_encode($data, JSON_UNESCAPED_UNICODE);
+        $cached_at = date('Y-m-d H:i:s');
+        db_query(
+            'INSERT INTO json_cache (widget_id, url_hash, url, content_json, fetched_at) VALUES (?,?,?,?,NOW())
+             ON DUPLICATE KEY UPDATE url=?, content_json=?, fetched_at=NOW()',
+            [$widget_id, $url_hash, $url, $encoded, $url, $encoded]
+        );
+    }
+
+    $results[] = [
+        'name'      => $source['name'] ?? '',
+        'data'      => $data,
+        'cached_at' => $cached_at,
+    ];
 }
 
-// Fetch de l'URL
-$ctx  = json_build_ctx();
-$body = @file_get_contents($url, false, $ctx);
-if ($body === false) json_error('Impossible de récupérer l\'URL : ' . htmlspecialchars($url));
-
-$data = json_decode($body, true);
-if ($data === null) json_error('La réponse n\'est pas un JSON valide.');
-
-// Sauvegarder en cache
-$encoded = json_encode($data, JSON_UNESCAPED_UNICODE);
-db_query(
-    'INSERT INTO json_cache (widget_id, url, content_json, fetched_at) VALUES (?,?,?,NOW())
-     ON DUPLICATE KEY UPDATE url=?, content_json=?, fetched_at=NOW()',
-    [$widget_id, $url, $encoded, $url, $encoded]
-);
-
-json_response([
-    'data'       => $data,
-    'cached_at'  => date('Y-m-d H:i:s'),
-    'from_cache' => false,
-]);
+json_response(['sources' => $results]);
 
 // --- Helpers -----------------------------------------------------------------
+
+function json_normalize_config(array $config): array {
+    // Rétrocompatibilité : ancien format { url, cache_minutes, display_fields }
+    if (!isset($config['sources']) && isset($config['url'])) {
+        return [
+            'sources' => [[
+                'name'           => '',
+                'url'            => $config['url'],
+                'display_fields' => $config['display_fields'] ?? [],
+            ]],
+            'cache_minutes' => $config['cache_minutes'] ?? 5,
+        ];
+    }
+    return $config;
+}
 
 function json_build_ctx(): mixed {
     return stream_context_create(['http' => [
@@ -96,16 +126,12 @@ function json_flatten(mixed $data, string $prefix = '', int $depth = 0): array {
         return [['path' => $prefix ?: 'value', 'sample' => mb_strimwidth((string)$data, 0, 80, '…')]];
     }
 
-    $fields = [];
+    $fields  = [];
     $is_list = array_keys($data) === range(0, count($data) - 1);
 
     if ($is_list) {
-        // Array : afficher juste le premier élément comme aperçu
-        $sample = is_scalar($data[0] ?? null)
-            ? mb_strimwidth((string)($data[0] ?? ''), 0, 80, '…')
-            : '[Tableau]';
+        $sample   = is_scalar($data[0] ?? null) ? mb_strimwidth((string)($data[0] ?? ''), 0, 80, '…') : '[Tableau]';
         $fields[] = ['path' => $prefix ?: '[]', 'sample' => "[{$sample}, …]"];
-        // Descendre dans le premier objet si c'est un tableau d'objets
         if (isset($data[0]) && is_array($data[0]) && $depth < 2) {
             foreach (json_flatten($data[0], ($prefix ? $prefix . '[0]' : '[0]'), $depth + 1) as $sub) {
                 $fields[] = $sub;

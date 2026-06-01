@@ -1137,7 +1137,7 @@ async function loadJsonWidget(widgetId, config) {
 
   try {
     const res = await apiFetch(`/api/v1/json?widget_id=${widgetId}`, null, 'GET');
-    renderJsonWidget(container, res.data, config);
+    renderJsonWidget(container, res.sources, config);
   } catch(e) {
     container.innerHTML = `<p class="text-red-400/60 text-sm py-4 text-center px-2">Erreur : ${escHtml(e.message)}</p>`;
   }
@@ -1150,27 +1150,51 @@ function getJsonValue(obj, path) {
   );
 }
 
-function renderJsonWidget(container, data, config) {
-  const fields = config.display_fields || [];
+function renderJsonWidget(container, sourcesData, config) {
+  const sources      = config.sources || [];
+  const multiSource  = sources.filter(s => s.name).length > 1;
+  let html           = '';
 
-  if (!fields.length) {
-    // Aucun champ sélectionné : afficher tout en raw JSON
-    container.innerHTML = `<pre class="text-xs text-white/70 font-mono whitespace-pre-wrap break-all px-1">${escHtml(JSON.stringify(data, null, 2))}</pre>`;
-    return;
-  }
+  sources.forEach((srcCfg, i) => {
+    const srcData   = sourcesData?.[i];
+    const fields    = srcCfg.display_fields || [];
+    const data      = srcData?.data ?? null;
+    const hasError  = srcData?.error;
 
-  const rows = fields.map(f => {
-    const raw     = getJsonValue(data, f.path);
-    const display = raw === undefined
-      ? '—'
-      : (typeof raw === 'object' ? JSON.stringify(raw) : String(raw));
-    const unit    = f.unit ? `<span class="text-white/40 text-xs ml-1">${escHtml(f.unit)}</span>` : '';
-    return `
-      <div class="flex items-center justify-between py-1.5 border-b border-white/5 last:border-0">
-        <span class="text-white/50 text-xs">${escHtml(f.label || f.path)}</span>
-        <span class="text-white/90 text-sm font-medium tabular-nums">${escHtml(display)}${unit}</span>
-      </div>`;
-  }).join('');
+    // En-tête de section si plusieurs sources nommées
+    if (multiSource && srcCfg.name) {
+      html += `<div class="text-xs font-semibold text-white/40 uppercase tracking-wide pt-2 pb-1 px-1 ${i > 0 ? 'border-t border-white/5 mt-1' : ''}">${escHtml(srcCfg.name)}</div>`;
+    }
 
-  container.innerHTML = `<div class="flex flex-col px-1">${rows}</div>`;
+    if (hasError) {
+      html += `<p class="text-red-400/60 text-xs px-1 py-1">⚠ ${escHtml(srcData.error)}</p>`;
+      return;
+    }
+
+    if (!data) {
+      html += `<p class="text-white/30 text-xs px-1 py-1">Pas de données</p>`;
+      return;
+    }
+
+    if (!fields.length) {
+      // Pas de champs → raw JSON
+      html += `<pre class="text-xs text-white/70 font-mono whitespace-pre-wrap break-all px-1">${escHtml(JSON.stringify(data, null, 2))}</pre>`;
+      return;
+    }
+
+    fields.forEach(f => {
+      const raw     = getJsonValue(data, f.path);
+      const display = raw === undefined
+        ? '—'
+        : (typeof raw === 'object' ? JSON.stringify(raw) : String(raw));
+      const unit = f.unit ? `<span class="text-white/40 text-xs ml-1">${escHtml(f.unit)}</span>` : '';
+      html += `
+        <div class="flex items-center justify-between py-1.5 border-b border-white/5 last:border-0 px-1">
+          <span class="text-white/50 text-xs">${escHtml(f.label || f.path)}</span>
+          <span class="text-white/90 text-sm font-medium tabular-nums">${escHtml(display)}${unit}</span>
+        </div>`;
+    });
+  });
+
+  container.innerHTML = html || '<p class="text-white/30 text-xs py-4 text-center">Aucune donnée</p>';
 }
