@@ -234,6 +234,7 @@ function renderWidget(array $w): void {
         'countdown' => renderCountdown($id, $config),
         'crypto'    => renderCrypto($id, $config),
         'lofi'      => renderLofi($id, $config),
+        'json'      => renderJson($id, $config),
         default     => null,
     };
 
@@ -567,6 +568,26 @@ function renderImage(array $config): void {
                  loading="lazy">
             ' . ($caption ? '<div class="absolute bottom-0 left-0 right-0 px-3 py-2 text-xs text-white/80"
                  style="background:linear-gradient(transparent,rgba(0,0,0,0.6))">' . $caption . '</div>' : '') . '
+          </div>';
+}
+
+function renderJson(int $id, array $config): void {
+    $url = $config['url'] ?? '';
+    if (!$url) {
+        echo '<p class="text-white/40 text-sm text-center py-4">URL JSON non configurée.</p>';
+        return;
+    }
+    $cfg = htmlspecialchars(json_encode([
+        'url'            => $url,
+        'cache_minutes'  => (int)($config['cache_minutes'] ?? 5),
+        'display_fields' => $config['display_fields'] ?? [],
+    ]), ENT_QUOTES);
+    echo '<div class="json-widget-container h-full overflow-auto"
+               data-widget-id="' . $id . '"
+               data-json-config="' . $cfg . '">
+            <div class="flex items-center gap-2 text-white/30 text-sm py-4 justify-center">
+              <span>⏳</span> Chargement…
+            </div>
           </div>';
 }
 

@@ -72,6 +72,12 @@ function initGrid(editMode) {
     initGithubWidget(wid, cfg);
   });
 
+  // JSON
+  document.querySelectorAll('[data-widget-type="json"]').forEach(el => {
+    const cfg = JSON.parse(el.querySelector('.json-widget-container')?.dataset.jsonConfig || '{}');
+    loadJsonWidget(el.dataset.widgetId, cfg);
+  });
+
   // Auto-refresh iframes embed
   document.querySelectorAll('[data-widget-type="embed"] iframe[data-refresh]').forEach(iframe => {
     const seconds = parseInt(iframe.dataset.refresh, 10);
@@ -1120,4 +1126,51 @@ function escHtml(str) {
 function debounce(fn, delay) {
   let t;
   return (...args) => { clearTimeout(t); t = setTimeout(() => fn(...args), delay); };
+}
+
+// ----------------------------------------------------------------
+// JSON Widget
+// ----------------------------------------------------------------
+async function loadJsonWidget(widgetId, config) {
+  const container = document.querySelector(`.json-widget-container[data-widget-id="${widgetId}"]`);
+  if (!container) return;
+
+  try {
+    const res = await apiFetch(`/api/v1/json?widget_id=${widgetId}`, null, 'GET');
+    renderJsonWidget(container, res.data, config);
+  } catch(e) {
+    container.innerHTML = `<p class="text-red-400/60 text-sm py-4 text-center px-2">Erreur : ${escHtml(e.message)}</p>`;
+  }
+}
+
+function getJsonValue(obj, path) {
+  return path.split('.').reduce(
+    (acc, key) => (acc != null && typeof acc === 'object') ? acc[key] : undefined,
+    obj
+  );
+}
+
+function renderJsonWidget(container, data, config) {
+  const fields = config.display_fields || [];
+
+  if (!fields.length) {
+    // Aucun champ sélectionné : afficher tout en raw JSON
+    container.innerHTML = `<pre class="text-xs text-white/70 font-mono whitespace-pre-wrap break-all px-1">${escHtml(JSON.stringify(data, null, 2))}</pre>`;
+    return;
+  }
+
+  const rows = fields.map(f => {
+    const raw     = getJsonValue(data, f.path);
+    const display = raw === undefined
+      ? '—'
+      : (typeof raw === 'object' ? JSON.stringify(raw) : String(raw));
+    const unit    = f.unit ? `<span class="text-white/40 text-xs ml-1">${escHtml(f.unit)}</span>` : '';
+    return `
+      <div class="flex items-center justify-between py-1.5 border-b border-white/5 last:border-0">
+        <span class="text-white/50 text-xs">${escHtml(f.label || f.path)}</span>
+        <span class="text-white/90 text-sm font-medium tabular-nums">${escHtml(display)}${unit}</span>
+      </div>`;
+  }).join('');
+
+  container.innerHTML = `<div class="flex flex-col px-1">${rows}</div>`;
 }
