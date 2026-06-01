@@ -34,7 +34,8 @@ self.addEventListener('fetch', e => {
     caches.match(e.request).then(cached => {
       const network = fetch(e.request).then(res => {
         if (res.ok && e.request.method === 'GET') {
-          caches.open(CACHE).then(c => c.put(e.request, res.clone()));
+          const clone = res.clone(); // clone synchrone avant tout gap async
+          caches.open(CACHE).then(c => c.put(e.request, clone));
         }
         return res;
       });

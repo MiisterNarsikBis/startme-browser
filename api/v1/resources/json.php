@@ -52,15 +52,19 @@ foreach ($sources as $source) {
     $data     = null;
     $cached_at = null;
 
-    // Vérifier le cache
+    // Vérifier le cache (try/catch : dégradation gracieuse si migration pas encore jouée)
     if ($cache_minutes > 0) {
-        $cache = db_fetch(
-            'SELECT content_json, fetched_at FROM json_cache WHERE widget_id=? AND url_hash=?',
-            [$widget_id, $url_hash]
-        );
-        if ($cache && strtotime($cache['fetched_at']) > time() - ($cache_minutes * 60)) {
-            $data      = json_decode($cache['content_json'], true);
-            $cached_at = $cache['fetched_at'];
+        try {
+            $cache = db_fetch(
+                'SELECT content_json, fetched_at FROM json_cache WHERE widget_id=? AND url_hash=?',
+                [$widget_id, $url_hash]
+            );
+            if ($cache && strtotime($cache['fetched_at']) > time() - ($cache_minutes * 60)) {
+                $data      = json_decode($cache['content_json'], true);
+                $cached_at = $cache['fetched_at'];
+            }
+        } catch (Throwable $e) {
+            // Cache indisponible, on fera un fetch direct
         }
     }
 
@@ -78,13 +82,17 @@ foreach ($sources as $source) {
             continue;
         }
 
-        $encoded  = json_encode($data, JSON_UNESCAPED_UNICODE);
+        $encoded   = json_encode($data, JSON_UNESCAPED_UNICODE);
         $cached_at = date('Y-m-d H:i:s');
-        db_query(
-            'INSERT INTO json_cache (widget_id, url_hash, url, content_json, fetched_at) VALUES (?,?,?,?,NOW())
-             ON DUPLICATE KEY UPDATE url=?, content_json=?, fetched_at=NOW()',
-            [$widget_id, $url_hash, $url, $encoded, $url, $encoded]
-        );
+        try {
+            db_query(
+                'INSERT INTO json_cache (widget_id, url_hash, url, content_json, fetched_at) VALUES (?,?,?,?,NOW())
+                 ON DUPLICATE KEY UPDATE url=?, content_json=?, fetched_at=NOW()',
+                [$widget_id, $url_hash, $url, $encoded, $url, $encoded]
+            );
+        } catch (Throwable $e) {
+            // Échec silencieux du cache
+        }
     }
 
     $results[] = [
