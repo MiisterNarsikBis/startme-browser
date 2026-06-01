@@ -113,7 +113,7 @@ function json_normalize_config(array $config): array {
     return $config;
 }
 
-function json_build_ctx(): mixed {
+function json_build_ctx() {
     return stream_context_create(['http' => [
         'timeout'       => 10,
         'user_agent'    => 'StartMe JSON Widget/1.0',
@@ -121,7 +121,7 @@ function json_build_ctx(): mixed {
     ]]);
 }
 
-function json_flatten(mixed $data, string $prefix = '', int $depth = 0): array {
+function json_flatten($data, string $prefix = '', int $depth = 0): array {
     if (!is_array($data)) {
         return [['path' => $prefix ?: 'value', 'sample' => mb_strimwidth((string)$data, 0, 80, '…')]];
     }
