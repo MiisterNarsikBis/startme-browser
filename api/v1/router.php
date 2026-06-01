@@ -35,6 +35,16 @@ require_once dirname(__DIR__, 2) . '/includes/db.php';
 require_once dirname(__DIR__, 2) . '/includes/auth_check.php';
 require_once dirname(__DIR__, 2) . '/includes/functions.php';
 
+// Garantir que toute exception non catchée renvoie du JSON, jamais du HTML
+set_exception_handler(function(Throwable $e): void {
+    if (!headers_sent()) {
+        http_response_code(500);
+        header('Content-Type: application/json; charset=utf-8');
+    }
+    echo json_encode(['error' => $e->getMessage()], JSON_UNESCAPED_UNICODE);
+    exit;
+});
+
 header('Content-Type: application/json; charset=utf-8');
 
 $method = $_SERVER['REQUEST_METHOD'];
