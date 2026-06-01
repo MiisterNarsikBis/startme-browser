@@ -49,6 +49,7 @@ const adminApp = {
       countdown: { title: 'Countdown', config: { target_date: '', label: 'Événement', show_seconds: true },     w: 3, h: 18 },
       crypto:    { title: 'Crypto',    config: { coins: ['bitcoin', 'ethereum'], currency: 'eur' },             w: 3, h: 24 },
       lofi:      { title: 'Lofi Radio',config: { video_id: 'jfKfPfyJRdk', label: 'Lofi Girl ☕' },             w: 2, h: 30 },
+      json:      { title: 'JSON',      config: { url: '', cache_minutes: 5, display_fields: [] },               w: 3, h: 25 },
     };
 
     const def = defaults[type] || { title: type, config: {}, w: 3, h: 4 };
@@ -69,7 +70,7 @@ const adminApp = {
       });
 
       // Ajouter visuellement dans la grille sans reload
-      const icons = { bookmarks:'🔖',rss:'📰',notes:'📝',todo:'✅',search:'🔍',weather:'🌤️',clock:'🕐',embed:'🖼️',calendar:'📅',image:'🖼️' };
+      const icons = { bookmarks:'🔖',rss:'📰',notes:'📝',todo:'✅',search:'🔍',weather:'🌤️',clock:'🕐',embed:'🖼️',calendar:'📅',image:'🖼️',json:'📊' };
 
       const content = `
         <div class="widget h-full flex flex-col rounded-2xl overflow-hidden relative"
@@ -392,6 +393,43 @@ const adminApp = {
             </div>
           </div>`;
         break;
+
+      case 'json': {
+        html += `
+          <div class="space-y-3">
+            <div>
+              <label class="text-sm text-white/60 block mb-1">URL de l'API JSON</label>
+              <div class="flex gap-2">
+                <input id="wf-json-url" type="url" value="${escHtml(config.url||'')}"
+                  class="form-input flex-1" placeholder="https://api.example.com/data.json">
+                <button type="button" onclick="adminApp.previewJson()"
+                  class="px-3 py-1.5 rounded-lg bg-brand/30 text-brand text-sm hover:bg-brand/50 transition whitespace-nowrap">
+                  Tester
+                </button>
+              </div>
+            </div>
+            <div>
+              <label class="text-sm text-white/60 block mb-1">Cache</label>
+              <select id="wf-json-cache" class="form-input w-full">
+                <option value="0"    ${(config.cache_minutes??5)==0    ?'selected':''}>Pas de cache</option>
+                <option value="1"    ${(config.cache_minutes??5)==1    ?'selected':''}>1 minute</option>
+                <option value="5"    ${(config.cache_minutes??5)==5    ?'selected':''}>5 minutes (recommandé)</option>
+                <option value="15"   ${(config.cache_minutes??5)==15   ?'selected':''}>15 minutes</option>
+                <option value="60"   ${(config.cache_minutes??5)==60   ?'selected':''}>1 heure</option>
+                <option value="1440" ${(config.cache_minutes??5)==1440 ?'selected':''}>24 heures</option>
+              </select>
+            </div>
+            <div>
+              <div class="flex items-center justify-between mb-2">
+                <label class="text-sm text-white/60">Champs à afficher</label>
+                <span id="json-fields-hint" class="text-xs text-white/30">Cliquez "Tester" pour choisir</span>
+              </div>
+              <div id="json-fields-area" class="space-y-1 max-h-60 overflow-y-auto"></div>
+            </div>
+          </div>`;
+        setTimeout(() => adminApp.initJsonFields(config.display_fields || []), 30);
+        break;
+      }
     }
 
     return html;
@@ -539,6 +577,11 @@ const adminApp = {
         config.label    = document.getElementById('wf-lofi-label')?.value.trim();
         break;
       }
+      case 'json':
+        config.url            = document.getElementById('wf-json-url')?.value.trim();
+        config.cache_minutes  = parseInt(document.getElementById('wf-json-cache')?.value || '5', 10);
+        config.display_fields = this._jsonFields.filter(f => f.path);
+        break;
     }
 
     await apiFetch(`/api/v1/widgets/${id}`, { title, config }, 'PUT');
@@ -853,6 +896,111 @@ const adminApp = {
       status.className = 'text-sm text-center py-2 rounded-xl bg-red-500/20 text-red-400';
       status.textContent = '❌ ' + (e.message || 'Erreur lors de l\'import.');
       input.value = '';
+    }
+  },
+
+  // ----------------------------------------------------------
+  // JSON Widget — Sélection des champs
+  // ----------------------------------------------------------
+  _jsonFields: [],
+  _jsonPreviewFields: null,
+
+  initJsonFields(fields) {
+    this._jsonFields       = fields.map(f => ({ ...f }));
+    this._jsonPreviewFields = null;
+    this._renderJsonFieldsArea();
+  },
+
+  _renderJsonFieldsArea() {
+    const area = document.getElementById('json-fields-area');
+    if (!area) return;
+
+    // Mode "picker" : après un test d'URL — affiche les cases à cocher
+    if (this._jsonPreviewFields) {
+      if (!this._jsonPreviewFields.length) {
+        area.innerHTML = '<p class="text-white/30 text-xs py-2">Aucun champ trouvé dans ce JSON.</p>';
+        return;
+      }
+      area.innerHTML = this._jsonPreviewFields.map((f, i) => {
+        const existing = this._jsonFields.find(x => x.path === f.path);
+        const checked  = !!existing;
+        return `
+          <label class="flex items-center gap-2 p-2 bg-white/5 rounded-lg hover:bg-white/10 transition cursor-pointer">
+            <input type="checkbox" class="accent-indigo-500 w-4 h-4 flex-shrink-0" ${checked ? 'checked' : ''}
+                   data-path="${escHtml(f.path)}" data-idx="${i}"
+                   onchange="adminApp._toggleJsonField(this.dataset.path, this.checked, ${i})">
+            <span class="text-xs font-mono text-brand/70 flex-shrink-0" style="min-width:90px;max-width:90px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="${escHtml(f.path)}">${escHtml(f.path)}</span>
+            <span class="text-xs text-white/30 flex-1 truncate" title="${escHtml(String(f.sample))}">${escHtml(String(f.sample))}</span>
+            <input type="text" placeholder="Label…" value="${escHtml(existing?.label||'')}"
+                   class="form-input flex-shrink-0 text-xs py-1 ${checked ? '' : 'opacity-30'}"
+                   style="width:90px" id="json-label-${i}" ${checked ? '' : 'disabled'}
+                   oninput="adminApp._setJsonFieldLabel('${escHtml(f.path)}', this.value)">
+          </label>`;
+      }).join('') + `<p class="text-xs text-white/30 mt-2 px-1">Cochez les champs voulus et personnalisez les labels.</p>`;
+      return;
+    }
+
+    // Mode "liste" : champs déjà configurés
+    if (!this._jsonFields.length) {
+      area.innerHTML = '<p class="text-white/30 text-xs py-1">Aucun champ — cliquez "Tester" pour choisir.</p>';
+      return;
+    }
+    area.innerHTML = this._jsonFields.map((f, i) => `
+      <div class="flex items-center gap-2 p-2 bg-white/5 rounded-lg">
+        <span class="text-xs font-mono text-brand/70 flex-shrink-0 truncate" style="min-width:80px;max-width:80px" title="${escHtml(f.path)}">${escHtml(f.path)}</span>
+        <input type="text" value="${escHtml(f.label||f.path)}" placeholder="Label…"
+               class="form-input flex-1 text-xs py-1"
+               oninput="adminApp._jsonFields[${i}].label=this.value">
+        <input type="text" value="${escHtml(f.unit||'')}" placeholder="unité"
+               class="form-input flex-shrink-0 text-xs py-1" style="width:56px"
+               oninput="adminApp._jsonFields[${i}].unit=this.value">
+        <button onclick="adminApp._removeJsonField(${i})"
+                class="text-white/30 hover:text-red-400 transition text-sm flex-shrink-0">✕</button>
+      </div>`).join('');
+  },
+
+  _toggleJsonField(path, checked, previewIndex) {
+    if (checked) {
+      if (!this._jsonFields.find(f => f.path === path)) {
+        this._jsonFields.push({ path, label: '', unit: '' });
+      }
+      const lbl = document.getElementById(`json-label-${previewIndex}`);
+      if (lbl) { lbl.disabled = false; lbl.classList.remove('opacity-30'); }
+    } else {
+      this._jsonFields = this._jsonFields.filter(f => f.path !== path);
+      const lbl = document.getElementById(`json-label-${previewIndex}`);
+      if (lbl) { lbl.disabled = true; lbl.classList.add('opacity-30'); lbl.value = ''; }
+    }
+  },
+
+  _setJsonFieldLabel(path, label) {
+    const field = this._jsonFields.find(f => f.path === path);
+    if (field) field.label = label;
+  },
+
+  _removeJsonField(i) {
+    this._jsonFields.splice(i, 1);
+    this._renderJsonFieldsArea();
+  },
+
+  async previewJson() {
+    const url = document.getElementById('wf-json-url')?.value.trim();
+    if (!url) { showToast('Entrez une URL d\'abord'); return; }
+
+    const hint = document.getElementById('json-fields-hint');
+    const area = document.getElementById('json-fields-area');
+    if (hint) hint.textContent = '⏳ Chargement…';
+    if (area) area.innerHTML = '';
+
+    try {
+      const res = await apiFetch('/api/v1/json/preview', { url }, 'POST');
+      this._jsonPreviewFields = res.fields;
+      this._renderJsonFieldsArea();
+      if (hint) hint.textContent = `${res.fields.length} champ(s) disponible(s)`;
+    } catch(e) {
+      this._jsonPreviewFields = null;
+      if (hint) hint.textContent = 'Erreur';
+      if (area) area.innerHTML = `<p class="text-red-400/60 text-xs p-2">${escHtml(e.message)}</p>`;
     }
   },
 

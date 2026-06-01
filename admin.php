@@ -217,6 +217,7 @@ $rDark    = (int)($r * 0.8); $gDark = (int)($g * 0.8); $bDark = (int)($b * 0.8);
           'countdown' => ['⏳', 'Countdown'],
           'crypto'    => ['📈', 'Crypto'],
           'lofi'      => ['🎵', 'Lofi Radio'],
+          'json'      => ['📊', 'JSON'],
         ];
         foreach ($widgetTypes as $type => [$icon, $label]):
         ?>

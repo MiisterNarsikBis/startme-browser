@@ -71,5 +71,6 @@ match ($resource) {
     'backup'    => require __DIR__ . '/resources/backup.php',
     'github'    => require __DIR__ . '/resources/github.php',
     'crypto'    => require __DIR__ . '/resources/crypto.php',
+    'json'      => require __DIR__ . '/resources/json.php',
     default     => json_error('Ressource inconnue.', 404),
 };
