@@ -18,22 +18,34 @@ Page de démarrage personnalisée auto-hébergée, servie par PHP + MySQL.
 | **Flux RSS** | Multi-flux avec onglets, cache serveur configurable, date de dernière mise à jour |
 | **Notes** | Zone de texte libre, sauvegarde automatique |
 | **Todo** | Liste de tâches avec cases à cocher et réorganisation |
-| **Recherche** | Barre de recherche vers le moteur de son choix |
+| **Recherche** | Barre de recherche vers le moteur de son choix, bangs de recherche (`!g`, `!yt`…) |
 | **Horloge** | Heure en temps réel |
-| **Embed** | Intégration d'une URL en iframe |
+| **Embed** | Intégration d'une URL en iframe, rafraîchissement automatique configurable |
 | **Calendrier** | Affichage mensuel |
 | **Image** | Bloc image personnalisé |
+| **Pomodoro** | Timer Pomodoro avec phases travail/pause, persistance localStorage, notifications navigateur |
+| **GitHub** | Affichage d'activité et de statistiques de dépôts GitHub |
+| **Countdown** | Compte à rebours vers une date cible |
+| **Crypto** | Cours de cryptomonnaies en temps réel |
+| **Lofi** | Lecteur de radios lo-fi intégré |
+| **JSON** | Requête HTTP vers une URL, extraction de champs, cache configurable, multi-sources |
 
 ### Général
 - Pages multiples avec navigation par onglets
+- Couleur d'accent personnalisable par page
 - Fond d'écran par page : couleur, dégradé ou image uploadée
+- Galerie d'images avec déduplication MD5 et suppression
 - Réorganisation des widgets par glisser-déposer (grille)
+- Palette de commandes (`Ctrl+K`) et raccourcis clavier globaux
 - Interface d'administration dédiée (`/admin`)
+- Import / Export de la configuration (sauvegarde complète)
 - Authentification par phrase mnémotechnique BIP39 (12 mots)
+- Confirmation avant déconnexion (rappel de la phrase secrète)
 - Auto-connexion persistante via cookie sécurisé (`HttpOnly`, renouvelé à chaque visite)
 - Protection brute-force sur la page de connexion (rate limiting par IP)
 - Migrations de base de données appliquées automatiquement au démarrage
 - API REST v1 (`/api/v1/`) pour toutes les opérations
+- PWA installable (Service Worker + Web App Manifest)
 
 ---
 
@@ -90,7 +102,11 @@ Toutes les requêtes passent par `/api/v1/{ressource}`.
 | `todos` | `POST`, `PUT /{id}`, `DELETE /{id}` | Tâches |
 | `weather` | `GET ?city=` ou `?lat=&lon=` | Données météo |
 | `rss` | `GET ?widget_id=&url=` | Lecture de flux RSS |
-| `upload` | `POST ?page_id=` | Upload fond d'écran |
+| `upload` | `POST ?page_id=` | Upload fond d'écran / galerie |
+| `github` | `GET ?username=` | Activité et stats GitHub |
+| `crypto` | `GET ?ids=` | Cours de cryptomonnaies |
+| `json` | `GET ?widget_id=` | Proxy + cache pour widget JSON |
+| `backup` | `GET` (export), `POST` (import) | Import / Export de la configuration |
 
 ---
 
@@ -100,11 +116,16 @@ Les migrations sont appliquées automatiquement à chaque chargement (si non dé
 
 ```
 migrations/
-├── 001_initial_schema.php        — Tables de base
-├── 002_remember_tokens.php       — Tokens "se souvenir de moi"
-├── 003_login_attempts.php        — Rate limiting connexion
-├── 004_widget_image_type.php     — Type widget image
-└── 005_rss_cache_unique_per_feed.php — Cache RSS par flux (fix contrainte)
+├── 001_initial_schema.php              — Tables de base
+├── 002_remember_tokens.php             — Tokens "se souvenir de moi"
+├── 003_login_attempts.php              — Rate limiting connexion
+├── 004_widget_image_type.php           — Type widget image
+├── 005_rss_cache_unique_per_feed.php   — Cache RSS par flux (fix contrainte)
+├── 006_widget_pomodoro_github.php      — Widgets Pomodoro et GitHub
+├── 007_widget_countdown_crypto_lofi.php — Widgets Countdown, Crypto et Lofi
+├── 008_pages_accent_color.php          — Couleur d'accent par page
+├── 009_widget_json.php                 — Widget JSON (cache + sélection de champs)
+└── 010_json_cache_multi_url.php        — Widget JSON multi-sources
 ```
 
 Pour ajouter une migration : créer `migrations/00X_description.php`.  
@@ -133,6 +154,8 @@ startme/
 ├── migrations/                   — Migrations auto
 ├── config.php                    — Configuration (à créer depuis le template)
 ├── config.template.php           — Template de configuration
+├── manifest.php                  — Web App Manifest (PWA)
+├── sw.js                         — Service Worker (PWA)
 ├── index.php                     — Page principale
 ├── admin.php                     — Interface d'administration
 ├── auth.php                      — Page de connexion
