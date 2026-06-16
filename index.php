@@ -225,7 +225,7 @@ function renderWidget(array $w): void {
         'todo'      => renderTodo($id),
         'search'    => renderSearch($config),
         'weather'   => renderWeather($id, $config),
-        'clock'     => renderClock(),
+        'clock'     => renderClock($id),
         'embed'     => renderEmbed($config),
         'calendar'  => renderCalendar($config),
         'image'     => renderImage($config),
@@ -402,9 +402,9 @@ function renderWeather(int $id, array $config): void {
             </div>';
 }
 
-function renderClock(): void {
+function renderClock(int $id): void {
     echo '<div class="flex flex-col items-center justify-center h-full gap-1">
-            <div id="clock-time-' . rand(1000,9999) . '" class="clock-time text-4xl font-mono font-bold text-white">00:00:00</div>
+            <div id="clock-time-' . $id . '" class="clock-time text-4xl font-mono font-bold text-white">00:00:00</div>
             <div class="clock-date text-sm text-white/50"></div>
           </div>';
 }

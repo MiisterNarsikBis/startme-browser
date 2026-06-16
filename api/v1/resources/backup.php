@@ -64,7 +64,7 @@ if ($method === 'POST') {
         json_error('Aucune page trouvée dans la sauvegarde.');
     }
 
-    $allowed_types = ['bookmarks','rss','notes','todo','search','weather','clock','embed','calendar','image'];
+    $allowed_types = ['bookmarks','rss','notes','todo','search','weather','clock','embed','calendar','image','pomodoro','github','countdown','crypto','lofi','json'];
 
     // Supprimer les données actuelles (CASCADE supprime widgets, bookmarks, notes, todos)
     db_query('DELETE FROM pages WHERE user_id=?', [$uid]);
