@@ -24,6 +24,9 @@ self.addEventListener('activate', e => {
 self.addEventListener('fetch', e => {
   const url = new URL(e.request.url);
 
+  // Ignorer les schemes non-cachables (extensions Chrome, etc.)
+  if (!url.protocol.startsWith('http')) return;
+
   // Toujours réseau pour : PHP, API, auth
   if (url.pathname.endsWith('.php') || url.pathname.includes('/api/')) {
     return;

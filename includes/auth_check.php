@@ -28,7 +28,11 @@ function get_current_user_id(): ?int {
         $row  = db_fetch('SELECT user_id FROM remember_tokens WHERE token_hash = ?', [$hash]);
         if ($row) {
             $uid = (int)$row['user_id'];
-            login_user($uid);
+            // Session directe sans session_regenerate_id : évite la race condition
+            // quand plusieurs requêtes API parallèles arrivent après expiration de session.
+            // session_start() pose un lock fichier → les requêtes concurrentes lisent
+            // le user_id déjà écrit par la première requête.
+            $_SESSION['user_id'] = $uid;
             // Rotation : nouveau token, invalide l'ancien (sécurité vol de cookie)
             // Chaque device a sa propre ligne → les autres navigateurs ne sont pas affectés
             $newToken = bin2hex(random_bytes(32));
