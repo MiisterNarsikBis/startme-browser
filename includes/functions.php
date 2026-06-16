@@ -55,6 +55,22 @@ function get_favicon(string $url): string {
     return $google_url;
 }
 
+function is_safe_url(string $url): bool {
+    $parsed = parse_url($url);
+    if (!$parsed) return false;
+    if (!in_array(strtolower($parsed['scheme'] ?? ''), ['http', 'https'], true)) return false;
+    $host = $parsed['host'] ?? '';
+    if (!$host) return false;
+    $ips = gethostbynamel($host);
+    if ($ips === false) return false;
+    foreach ($ips as $ip) {
+        if (!filter_var($ip, FILTER_VALIDATE_IP, FILTER_FLAG_NO_PRIV_RANGE | FILTER_FLAG_NO_RES_RANGE)) {
+            return false;
+        }
+    }
+    return true;
+}
+
 function sanitize_url(string $url): string {
     if (!preg_match('#^https?://#i', $url)) {
         $url = 'https://' . $url;

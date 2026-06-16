@@ -9,7 +9,7 @@ if ($method === 'POST' && $sub === 'preview') {
     $d   = request_json();
     $url = trim($d['url'] ?? '');
 
-    if (!$url || !preg_match('#^https?://#i', $url)) {
+    if (!$url || !is_safe_url($url)) {
         json_error('URL invalide ou manquante.');
     }
 
@@ -37,7 +37,7 @@ $widget = db_fetch(
 if (!$widget) json_error('Widget introuvable.', 404);
 
 $config        = json_normalize_config(json_decode($widget['config_json'], true) ?? []);
-$sources       = $config['sources'] ?? [];
+$sources       = array_slice($config['sources'] ?? [], 0, 10);
 $cache_minutes = max(0, (int)($config['cache_minutes'] ?? 5));
 
 if (empty($sources)) json_error('Aucune source configurée.');
@@ -47,6 +47,10 @@ $results = [];
 foreach ($sources as $source) {
     $url = trim($source['url'] ?? '');
     if (!$url) continue;
+    if (!is_safe_url($url)) {
+        $results[] = ['name' => $source['name'] ?? '', 'error' => 'URL non autorisée.'];
+        continue;
+    }
 
     $url_hash = md5($url);
     $data     = null;
@@ -63,8 +67,12 @@ foreach ($sources as $source) {
                 $data      = json_decode($cache['content_json'], true);
                 $cached_at = $cache['fetched_at'];
             }
-        } catch (Throwable $e) {
-            // Cache indisponible, on fera un fetch direct
+        } catch (PDOException $e) {
+            // Table absente (migration pas encore jouée) : dégradation silencieuse.
+            // Toute autre erreur DB est loggée pour visibilité.
+            if ($e->getCode() !== '42S02') {
+                error_log('json_cache read: ' . $e->getMessage());
+            }
         }
     }
 
@@ -90,8 +98,8 @@ foreach ($sources as $source) {
                  ON DUPLICATE KEY UPDATE url=?, content_json=?, fetched_at=NOW()',
                 [$widget_id, $url_hash, $url, $encoded, $url, $encoded]
             );
-        } catch (Throwable $e) {
-            // Échec silencieux du cache
+        } catch (PDOException $e) {
+            error_log('json_cache write: ' . $e->getMessage());
         }
     }
 

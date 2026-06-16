@@ -37,12 +37,28 @@ require_once dirname(__DIR__, 2) . '/includes/functions.php';
 
 // Garantir que toute exception non catchée renvoie du JSON, jamais du HTML
 set_exception_handler(function(Throwable $e): void {
+    error_log($e->getMessage() . ' in ' . $e->getFile() . ':' . $e->getLine());
+    if (ob_get_level()) ob_clean();
     if (!headers_sent()) {
         http_response_code(500);
         header('Content-Type: application/json; charset=utf-8');
     }
-    echo json_encode(['error' => $e->getMessage()], JSON_UNESCAPED_UNICODE);
+    echo json_encode(['error' => 'Erreur interne du serveur.'], JSON_UNESCAPED_UNICODE);
     exit;
+});
+
+// Les fatals PHP (OOM, parse errors) bypass set_exception_handler
+register_shutdown_function(function(): void {
+    $err = error_get_last();
+    if ($err && in_array($err['type'], [E_ERROR, E_PARSE, E_CORE_ERROR, E_COMPILE_ERROR], true)) {
+        error_log('PHP fatal: ' . $err['message'] . ' in ' . $err['file'] . ':' . $err['line']);
+        if (ob_get_level()) ob_clean();
+        if (!headers_sent()) {
+            http_response_code(500);
+            header('Content-Type: application/json; charset=utf-8');
+        }
+        echo json_encode(['error' => 'Erreur interne du serveur.'], JSON_UNESCAPED_UNICODE);
+    }
 });
 
 header('Content-Type: application/json; charset=utf-8');

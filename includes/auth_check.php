@@ -1,6 +1,22 @@
 <?php
 require_once __DIR__ . '/db.php';
 
+function is_https(): bool {
+    return (!empty($_SERVER['HTTPS']) && $_SERVER['HTTPS'] !== 'off')
+        || ($_SERVER['HTTP_X_FORWARDED_PROTO'] ?? '') === 'https'
+        || ($_SERVER['HTTP_X_FORWARDED_SSL'] ?? '') === 'on';
+}
+
+function remember_cookie_params(int $expires): array {
+    return [
+        'expires'  => $expires,
+        'path'     => '/',
+        'secure'   => is_https(),
+        'httponly' => true,
+        'samesite' => 'Lax',
+    ];
+}
+
 function session_start_secure(): void {
     if (session_status() === PHP_SESSION_NONE) {
         ini_set('session.cookie_httponly', '1');
@@ -8,7 +24,7 @@ function session_start_secure(): void {
         session_set_cookie_params([
             'lifetime' => SESSION_LIFETIME,
             'path'     => '/',
-            'secure'   => isset($_SERVER['HTTPS']),
+            'secure'   => is_https(),
             'httponly' => true,
             'samesite' => 'Lax',
         ]);
@@ -28,23 +44,18 @@ function get_current_user_id(): ?int {
         $row  = db_fetch('SELECT user_id FROM remember_tokens WHERE token_hash = ?', [$hash]);
         if ($row) {
             $uid = (int)$row['user_id'];
-            // Session directe sans session_regenerate_id : évite la race condition
-            // quand plusieurs requêtes API parallèles arrivent après expiration de session.
-            // session_start() pose un lock fichier → les requêtes concurrentes lisent
-            // le user_id déjà écrit par la première requête.
+            // Write user_id before regenerating: concurrent requests waiting on the
+            // old session lock find it in the preserved old session file (false = keep).
+            // session_regenerate_id(false) rotates the session ID (prevents fixation)
+            // without destroying the old session that concurrent readers hold a lock on.
             $_SESSION['user_id'] = $uid;
+            session_regenerate_id(false);
             // Rotation : nouveau token, invalide l'ancien (sécurité vol de cookie)
             // Chaque device a sa propre ligne → les autres navigateurs ne sont pas affectés
             $newToken = bin2hex(random_bytes(32));
             $newHash  = hash('sha256', $newToken);
             db_query('UPDATE remember_tokens SET token_hash = ? WHERE token_hash = ?', [$newHash, $hash]);
-            setcookie('remember_me', $newToken, [
-                'expires'  => time() + 10 * 365 * 24 * 3600,
-                'path'     => '/',
-                'secure'   => isset($_SERVER['HTTPS']),
-                'httponly' => true,
-                'samesite' => 'Lax',
-            ]);
+            setcookie('remember_me', $newToken, remember_cookie_params(time() + 10 * 365 * 24 * 3600));
             return $uid;
         }
     }
@@ -76,13 +87,7 @@ function set_remember_token(int $user_id): void {
     $token = bin2hex(random_bytes(32)); // 64 chars hex
     $hash  = hash('sha256', $token);
     db_insert('INSERT INTO remember_tokens (user_id, token_hash) VALUES (?, ?)', [$user_id, $hash]);
-    setcookie('remember_me', $token, [
-        'expires'  => time() + 10 * 365 * 24 * 3600, // 10 ans
-        'path'     => '/',
-        'secure'   => isset($_SERVER['HTTPS']),
-        'httponly' => true,
-        'samesite' => 'Lax',
-    ]);
+    setcookie('remember_me', $token, remember_cookie_params(time() + 10 * 365 * 24 * 3600));
 }
 
 function logout_user(): void {
@@ -94,13 +99,7 @@ function logout_user(): void {
         db_query('DELETE FROM remember_tokens WHERE token_hash = ?', [$hash]);
     }
     // Effacer le cookie
-    setcookie('remember_me', '', [
-        'expires'  => time() - 3600,
-        'path'     => '/',
-        'secure'   => isset($_SERVER['HTTPS']),
-        'httponly' => true,
-        'samesite' => 'Lax',
-    ]);
+    setcookie('remember_me', '', remember_cookie_params(time() - 3600));
     session_destroy();
 }
 
