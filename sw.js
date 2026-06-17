@@ -35,14 +35,19 @@ self.addEventListener('fetch', e => {
   // Cache-first pour les assets statiques
   e.respondWith(
     caches.match(e.request).then(cached => {
-      const network = fetch(e.request).then(res => {
+      const networkPromise = fetch(e.request).then(res => {
         if (res.ok && e.request.method === 'GET') {
-          const clone = res.clone(); // clone synchrone avant tout gap async
+          const clone = res.clone();
           caches.open(CACHE).then(c => c.put(e.request, clone));
         }
         return res;
       });
-      return cached || network;
+      if (cached) {
+        // Retourner le cache immédiatement ; mise à jour en arrière-plan (échecs ignorés)
+        networkPromise.catch(() => {});
+        return cached;
+      }
+      return networkPromise;
     })
   );
 });

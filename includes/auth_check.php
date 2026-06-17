@@ -44,18 +44,17 @@ function get_current_user_id(): ?int {
         $row  = db_fetch('SELECT user_id FROM remember_tokens WHERE token_hash = ?', [$hash]);
         if ($row) {
             $uid = (int)$row['user_id'];
-            // Write user_id before regenerating: concurrent requests waiting on the
-            // old session lock find it in the preserved old session file (false = keep).
-            // session_regenerate_id(false) rotates the session ID (prevents fixation)
-            // without destroying the old session that concurrent readers hold a lock on.
             $_SESSION['user_id'] = $uid;
-            session_regenerate_id(false);
-            // Rotation : nouveau token, invalide l'ancien (sécurité vol de cookie)
-            // Chaque device a sa propre ligne → les autres navigateurs ne sont pas affectés
+            session_regenerate_id(false); // Nouveau ID, ancien fichier session conservé
+            session_write_close();        // Flush immédiat : les requêtes concurrentes lisent le session dès maintenant
+            // Rotation atomique : si une requête concurrente a déjà tourné le token,
+            // rowCount() vaut 0 et on ne touche pas au cookie (cohérence DB ↔ navigateur).
             $newToken = bin2hex(random_bytes(32));
             $newHash  = hash('sha256', $newToken);
-            db_query('UPDATE remember_tokens SET token_hash = ? WHERE token_hash = ?', [$newHash, $hash]);
-            setcookie('remember_me', $newToken, remember_cookie_params(time() + 10 * 365 * 24 * 3600));
+            $stmt = db_query('UPDATE remember_tokens SET token_hash = ? WHERE token_hash = ?', [$newHash, $hash]);
+            if ($stmt->rowCount() > 0) {
+                setcookie('remember_me', $newToken, remember_cookie_params(time() + 10 * 365 * 24 * 3600));
+            }
             return $uid;
         }
     }
