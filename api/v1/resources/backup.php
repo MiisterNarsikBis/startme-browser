@@ -32,7 +32,7 @@ if ($method === 'GET') {
             }
             if ($w['type'] === 'todo') {
                 $w['todos'] = db_fetchAll(
-                    'SELECT title, done, position FROM todos WHERE widget_id=? ORDER BY position',
+                    'SELECT title, done, due_date, position FROM todos WHERE widget_id=? ORDER BY position',
                     [$wid]
                 );
             }
@@ -120,11 +120,12 @@ if ($method === 'POST') {
             }
             if ($type === 'todo') {
                 foreach ($wd['todos'] ?? [] as $td) {
-                    $tt = mb_substr($td['title'] ?? '', 0, 500);
+                    $tt  = mb_substr($td['title'] ?? '', 0, 500);
                     if (!$tt) continue;
+                    $due = (!empty($td['due_date'])) ? date('Y-m-d', strtotime($td['due_date'])) : null;
                     db_insert(
-                        'INSERT INTO todos (widget_id, title, done, position) VALUES (?,?,?,?)',
-                        [$wid, $tt, (int)($td['done'] ?? 0), (int)($td['position'] ?? 0)]
+                        'INSERT INTO todos (widget_id, title, done, due_date, position) VALUES (?,?,?,?,?)',
+                        [$wid, $tt, (int)($td['done'] ?? 0), $due, (int)($td['position'] ?? 0)]
                     );
                 }
             }

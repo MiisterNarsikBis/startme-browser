@@ -205,6 +205,16 @@ const adminApp = {
             <label class="text-sm text-white/60 block mb-1">Articles max par flux</label>
             <input id="wf-rss-max" type="number" value="${config.max_items || 10}" min="1" max="50"
               class="form-input w-24">
+          </div>
+          <div>
+            <label class="text-sm text-white/60 block mb-1">Rafraîchissement automatique</label>
+            <select id="wf-rss-refresh" class="form-input w-full">
+              <option value="0"   ${(config.refresh_minutes||0)==0   ?'selected':''}>Désactivé</option>
+              <option value="15"  ${(config.refresh_minutes||0)==15  ?'selected':''}>Toutes les 15 min</option>
+              <option value="30"  ${(config.refresh_minutes||0)==30  ?'selected':''}>Toutes les 30 min</option>
+              <option value="60"  ${(config.refresh_minutes||0)==60  ?'selected':''}>Toutes les heures</option>
+              <option value="120" ${(config.refresh_minutes||0)==120 ?'selected':''}>Toutes les 2 heures</option>
+            </select>
           </div>`;
 
         // Initialiser la liste après le rendu
@@ -221,6 +231,9 @@ const adminApp = {
               <option value="duckduckgo" ${config.engine==='duckduckgo'?'selected':''}>🦆 DuckDuckGo</option>
               <option value="brave"      ${config.engine==='brave'?'selected':''}>🦁 Brave Search</option>
               <option value="bing"       ${config.engine==='bing'?'selected':''}>🌐 Bing</option>
+              <option value="kagi"       ${config.engine==='kagi'?'selected':''}>🔑 Kagi</option>
+              <option value="perplexity" ${config.engine==='perplexity'?'selected':''}>🤖 Perplexity</option>
+              <option value="ecosia"     ${config.engine==='ecosia'?'selected':''}>🌿 Ecosia</option>
             </select>
           </div>`;
         break;
@@ -553,9 +566,10 @@ const adminApp = {
         config.show_title = document.getElementById('wf-show-title')?.checked;
         break;
       case 'rss':
-        config.feeds     = this._rssFeeds;
-        config.max_items = parseInt(document.getElementById('wf-rss-max')?.value || 10);
-        delete config.url; // supprimer l'ancien format
+        config.feeds           = this._rssFeeds;
+        config.max_items       = parseInt(document.getElementById('wf-rss-max')?.value || 10);
+        config.refresh_minutes = parseInt(document.getElementById('wf-rss-refresh')?.value || 0, 10);
+        delete config.url;
         break;
       case 'search':
         config.engine = document.getElementById('wf-engine')?.value;

@@ -17,16 +17,23 @@ if ($method === 'POST' && $id === null) {
     if (!owns_widget_todos($uid, $widget_id)) json_error('Accès refusé.', 403);
     $title = trim($d['title'] ?? '');
     if (!$title) json_error('Titre requis.');
+    $due    = isset($d['due_date']) && $d['due_date'] ? date('Y-m-d', strtotime($d['due_date'])) : null;
     $maxPos = db_fetch('SELECT MAX(position) as m FROM todos WHERE widget_id=?', [$widget_id])['m'] ?? 0;
-    $newId  = db_insert('INSERT INTO todos (widget_id, title, position) VALUES (?,?,?)', [$widget_id, $title, $maxPos + 1]);
-    json_response(['id' => $newId]);
+    $newId  = db_insert('INSERT INTO todos (widget_id, title, due_date, position) VALUES (?,?,?,?)', [$widget_id, $title, $due, $maxPos + 1]);
+    json_response(['id' => $newId, 'due_date' => $due]);
 }
 
-// PUT — toggle done
+// PUT — toggle done OU mise à jour de la date d'échéance
 if ($method === 'PUT' && $id !== null) {
     $todo = db_fetch('SELECT widget_id, done FROM todos WHERE id=?', [$id]);
     if (!$todo || !owns_widget_todos($uid, $todo['widget_id'])) json_error('Accès refusé.', 403);
-    db_query('UPDATE todos SET done=? WHERE id=?', [$todo['done'] ? 0 : 1, $id]);
+    $d = request_json();
+    if (array_key_exists('due_date', $d)) {
+        $due = $d['due_date'] ? date('Y-m-d', strtotime($d['due_date'])) : null;
+        db_query('UPDATE todos SET due_date=? WHERE id=?', [$due, $id]);
+    } else {
+        db_query('UPDATE todos SET done=? WHERE id=?', [$todo['done'] ? 0 : 1, $id]);
+    }
     json_response(['ok' => true]);
 }
 

@@ -270,3 +270,59 @@ html.light #app-header .hover\:text-white:hover { color: #0f172a !important; }
 html.light #app-header .hover\:bg-white\/10:hover { background: rgba(0,0,0,0.06) !important; }
 html.light #app-header .bg-white\/10 { background: rgba(0,0,0,0.06) !important; }
 html.light #app-header .border-white\/20 { border-color: rgba(0,0,0,0.12) !important; }
+
+/* -- Notes : aperçu Markdown ------------------------------ */
+.note-preview { color: var(--text-2); line-height: 1.6; }
+.note-preview h1,.note-preview h2,.note-preview h3 {
+  font-weight: 600; color: var(--text-1); margin: 0.75em 0 0.25em;
+}
+.note-preview h1 { font-size: 1.1rem; }
+.note-preview h2 { font-size: 1rem; }
+.note-preview h3 { font-size: 0.9rem; }
+.note-preview p  { margin: 0.4em 0; font-size: 0.875rem; }
+.note-preview ul,.note-preview ol { padding-left: 1.25rem; margin: 0.4em 0; font-size: 0.875rem; }
+.note-preview li { margin: 0.2em 0; }
+.note-preview code {
+  background: rgba(99,102,241,0.15); color: #a5b4fc;
+  padding: 0.1em 0.35em; border-radius: 0.25rem; font-size: 0.8rem;
+}
+.note-preview pre {
+  background: rgba(0,0,0,0.35); border-radius: 0.5rem;
+  padding: 0.6rem 0.75rem; overflow-x: auto; margin: 0.5em 0;
+}
+.note-preview pre code { background: none; padding: 0; font-size: 0.78rem; color: #e2e8f0; }
+.note-preview blockquote {
+  border-left: 3px solid rgba(99,102,241,0.5); margin: 0.5em 0;
+  padding: 0.25rem 0.75rem; color: var(--text-3); font-style: italic;
+}
+.note-preview a { color: #818cf8; text-decoration: underline; }
+.note-preview hr { border: none; border-top: 1px solid rgba(255,255,255,0.1); margin: 0.75em 0; }
+
+/* -- Todos : champ date d'échéance ------------------------- */
+.todo-due {
+  appearance: none; -webkit-appearance: none;
+  background: transparent; border: none; outline: none;
+  font-size: 0.7rem; cursor: pointer;
+  width: 0; overflow: hidden; opacity: 0;
+  transition: width 0.2s, opacity 0.2s;
+  flex-shrink: 0;
+}
+.todo-row:hover .todo-due,
+.todo-due.has-date {
+  width: 6.5rem; opacity: 1;
+}
+.todo-due::-webkit-calendar-picker-indicator {
+  filter: invert(0.5); cursor: pointer; padding: 0; margin: 0;
+}
+
+/* -- Todos : champ date dans le formulaire d'ajout --------- */
+.todo-due-add {
+  appearance: none; -webkit-appearance: none;
+  width: 2rem; padding: 0.375rem 0.5rem;
+  transition: width 0.2s;
+  color-scheme: dark;
+}
+.todo-due-add:focus { width: 7.5rem; }
+.todo-due-add::-webkit-calendar-picker-indicator {
+  filter: invert(0.5); cursor: pointer;
+}

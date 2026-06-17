@@ -77,6 +77,9 @@ $rDark   = (int)($r * 0.8); $gDark = (int)($g * 0.8); $bDark = (int)($b * 0.8);
 <!-- Alpine.js -->
 <script defer src="https://cdn.jsdelivr.net/npm/alpinejs@3/dist/cdn.min.js"></script>
 
+<!-- Marked.js (rendu Markdown des notes) -->
+<script src="https://cdn.jsdelivr.net/npm/marked@9/marked.min.js"></script>
+
 <link rel="stylesheet" href="<?= BASE_URL ?>/assets/css/app.css?v=<?= filemtime(__DIR__.'/assets/css/app.css') ?>">
 <?php if ($page['bg_type'] === 'image' && !empty($page['bg_value'])): ?>
 <link rel="preload" as="image" href="<?= htmlspecialchars($page['bg_value']) ?>">
@@ -148,6 +151,21 @@ $rDark   = (int)($r * 0.8); $gDark = (int)($g * 0.8); $bDark = (int)($b * 0.8);
 
 <!-- GRILLE DE WIDGETS -->
 <main class="relative z-10 pt-16 p-4 min-h-screen">
+<?php if (empty($widgets)): ?>
+  <div class="flex flex-col items-center justify-center min-h-[70vh] gap-6 text-center select-none">
+    <div class="text-8xl opacity-50">✨</div>
+    <div>
+      <h2 class="text-2xl font-bold mb-2" style="color:var(--text-1)">Bienvenue sur votre tableau de bord</h2>
+      <p class="text-sm max-w-xs mx-auto" style="color:var(--text-3)">
+        Votre page est vide. Ajoutez vos premiers widgets pour personnaliser votre espace.
+      </p>
+    </div>
+    <a href="<?= BASE_URL ?>/admin.php?page=<?= htmlspecialchars($slug) ?>"
+       class="flex items-center gap-2 px-6 py-3 bg-brand hover:bg-brand-dark rounded-xl font-semibold transition text-white shadow-lg">
+      ✏️ Ajouter mes premiers widgets →
+    </a>
+  </div>
+<?php else: ?>
   <div id="grid" class="grid-stack">
     <?php foreach ($widgets as $w): ?>
     <div class="grid-stack-item"
@@ -160,6 +178,7 @@ $rDark   = (int)($r * 0.8); $gDark = (int)($g * 0.8); $bDark = (int)($b * 0.8);
     </div>
     <?php endforeach; ?>
   </div>
+<?php endif; ?>
 </main>
 
 <!-- Palette Ctrl+K -->
@@ -319,12 +338,13 @@ function renderRss(int $id, array $config): void {
         $tabs .= '</div>';
     }
 
-    $firstUrl = htmlspecialchars($feeds[0]['url'], ENT_QUOTES);
+    $firstUrl       = htmlspecialchars($feeds[0]['url'], ENT_QUOTES);
+    $refreshMinutes = (int)($config['refresh_minutes'] ?? 0);
 
     echo '<div class="relative">';
     echo '<span class="rss-cached-at absolute top-0 right-0 text-[10px] text-white/20 tabular-nums pointer-events-none z-10" data-widget-id="' . $id . '"></span>';
     echo $tabs;
-    echo '<div class="rss-feed-container overflow-auto" data-widget-id="' . $id . '" data-feeds="' . $feedsJson . '" data-current-url="' . $firstUrl . '">
+    echo '<div class="rss-feed-container overflow-auto" data-widget-id="' . $id . '" data-feeds="' . $feedsJson . '" data-current-url="' . $firstUrl . '" data-refresh-minutes="' . $refreshMinutes . '">
             <div class="flex items-center gap-2 text-white/30 text-sm py-4">
               <svg class="animate-spin w-4 h-4" fill="none" viewBox="0 0 24 24">
                 <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"/>
@@ -337,46 +357,77 @@ function renderRss(int $id, array $config): void {
 }
 
 function renderNotes(int $id): void {
-    $note = db_fetch('SELECT content FROM notes WHERE widget_id=?', [$id]);
+    $note    = db_fetch('SELECT content FROM notes WHERE widget_id=?', [$id]);
     $content = htmlspecialchars($note['content'] ?? '');
-    echo '<textarea class="w-full h-full bg-transparent text-sm text-white/80 resize-none
-                           focus:outline-none placeholder-white/30"
-                   placeholder="Prendre des notes…"
-                   data-widget-id="' . $id . '"
-                   onchange="saveNote(' . $id . ', this.value)"
-                   oninput="debounceSaveNote(' . $id . ', this.value)">' . $content . '</textarea>';
+    echo '<div class="notes-widget h-full flex flex-col gap-1" data-widget-id="' . $id . '">
+            <div class="flex justify-end flex-shrink-0">
+              <button onclick="toggleNotePreview(' . $id . ')"
+                class="note-toggle-btn text-[11px] text-white/35 hover:text-white/70 px-2 py-0.5 rounded-lg hover:bg-white/10 transition">
+                👁 Aperçu
+              </button>
+            </div>
+            <textarea class="flex-1 min-h-0 w-full bg-transparent text-sm resize-none
+                             focus:outline-none placeholder-white/30"
+                     style="color:var(--text-2)"
+                     placeholder="Prendre des notes… (Markdown supporté)"
+                     data-widget-id="' . $id . '"
+                     onchange="saveNote(' . $id . ', this.value)"
+                     oninput="debounceSaveNote(' . $id . ', this.value)">' . $content . '</textarea>
+            <div class="note-preview hidden flex-1 min-h-0 overflow-auto text-sm"></div>
+          </div>';
 }
 
 function renderTodo(int $id): void {
     $todos = db_fetchAll('SELECT * FROM todos WHERE widget_id=? ORDER BY position', [$id]);
+    $today = date('Y-m-d');
     echo '<div class="flex flex-col gap-1 todo-list" data-widget-id="' . $id . '">';
     foreach ($todos as $t) {
-        $done  = $t['done'] ? 'line-through text-white/30' : 'text-white/80';
+        $done  = $t['done'] ? 'line-through opacity-40' : '';
         $check = $t['done'] ? 'checked' : '';
-        echo '<label class="flex items-center gap-2.5 py-1 px-1 rounded-lg hover:bg-white/5 cursor-pointer group">
+        $due   = $t['due_date'] ?? null;
+        if ($due && !$t['done']) {
+            if ($due < $today)      $dueClass = 'text-red-400';
+            elseif ($due === $today) $dueClass = 'text-orange-300';
+            else                     $dueClass = 'text-white/30';
+        } else {
+            $dueClass = 'text-white/20';
+        }
+        $hasDue = $due ? 'has-date' : '';
+        echo '<label class="todo-row flex items-center gap-2 py-1 px-1 rounded-lg hover:bg-white/5 cursor-pointer group">
                 <input type="checkbox" ' . $check . ' class="accent-indigo-500 w-4 h-4 flex-shrink-0"
                   onchange="toggleTodo(' . (int)$t['id'] . ', this)">
-                <span class="text-sm flex-1 ' . $done . '">' . htmlspecialchars($t['title']) . '</span>
+                <span class="text-sm flex-1 text-white/80 ' . $done . '">' . htmlspecialchars($t['title']) . '</span>
+                <input type="date" value="' . htmlspecialchars($due ?? '') . '"
+                  class="todo-due ' . $dueClass . ' ' . $hasDue . '"
+                  onchange="updateTodoDue(' . (int)$t['id'] . ', this.value, this)"
+                  onclick="event.stopPropagation()"
+                  title="Date d\'échéance">
                 <button onclick="deleteTodo(' . (int)$t['id'] . ', this.closest(\'label\'))"
-                  class="opacity-0 group-hover:opacity-100 text-white/30 hover:text-red-400 transition text-xs">✕</button>
+                  class="opacity-0 group-hover:opacity-100 text-white/30 hover:text-red-400 transition text-xs flex-shrink-0">✕</button>
               </label>';
     }
     echo '</div>
-          <form onsubmit="addTodo(event, ' . $id . ')" class="mt-2 flex gap-2">
+          <form onsubmit="addTodo(event, ' . $id . ')" class="mt-2 flex gap-1.5">
             <input type="text" placeholder="Nouvelle tâche…"
               class="flex-1 bg-white/10 border border-white/10 rounded-lg px-3 py-1.5 text-sm
-                     text-white placeholder-white/30 focus:outline-none focus:border-brand">
-            <button type="submit" class="bg-brand/30 hover:bg-brand/60 px-3 py-1.5 rounded-lg text-sm transition">+</button>
+                     text-white placeholder-white/30 focus:outline-none focus:border-brand min-w-0">
+            <input type="date" name="due" title="Échéance (optionnel)"
+              class="todo-due-add bg-white/10 border border-white/10 rounded-lg text-xs
+                     text-white/50 focus:outline-none focus:border-brand cursor-pointer">
+            <button type="submit" class="bg-brand/30 hover:bg-brand/60 px-3 py-1.5 rounded-lg text-sm transition flex-shrink-0">+</button>
           </form>';
 }
 
 function renderSearch(array $config): void {
     $engine = $config['engine'] ?? 'google';
     $engines = [
-        'google'     => ['https://www.google.com/search?q=', 'Rechercher… ou !yt !gh !w !r !npm'],
-        'duckduckgo' => ['https://duckduckgo.com/?q=',       'Rechercher… ou !yt !gh !w !r !npm'],
-        'brave'      => ['https://search.brave.com/search?q=','Rechercher… ou !yt !gh !w !r !npm'],
-        'bing'       => ['https://www.bing.com/search?q=',   'Rechercher… ou !yt !gh !w !r !npm'],
+        'google'     => ['https://www.google.com/search?q=',             'Rechercher… ou !yt !gh !w !r !npm'],
+        'duckduckgo' => ['https://duckduckgo.com/?q=',                   'Rechercher… ou !yt !gh !w !r !npm'],
+        'brave'      => ['https://search.brave.com/search?q=',           'Rechercher… ou !yt !gh !w !r !npm'],
+        'bing'       => ['https://www.bing.com/search?q=',               'Rechercher… ou !yt !gh !w !r !npm'],
+        'kagi'       => ['https://kagi.com/search?q=',                   'Rechercher avec Kagi…'],
+        'perplexity' => ['https://www.perplexity.ai/search?q=',          'Demander à Perplexity…'],
+        'ecosia'     => ['https://www.ecosia.org/search?q=',             'Rechercher avec Ecosia…'],
     ];
     [$action, $placeholder] = $engines[$engine] ?? $engines['google'];
     echo '<form data-search-engine="' . htmlspecialchars($engine, ENT_QUOTES) . '"

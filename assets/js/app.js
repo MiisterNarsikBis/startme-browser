@@ -32,7 +32,17 @@ function initGrid(editMode) {
 
   // Charger les données dynamiques
   document.querySelectorAll('[data-widget-type="rss"]').forEach(el => {
-    loadRss(el.dataset.widgetId);
+    const widgetId  = el.dataset.widgetId;
+    loadRss(widgetId);
+    const container = el.querySelector('.rss-feed-container');
+    const refreshMin = parseInt(container?.dataset.refreshMinutes || 0, 10);
+    if (refreshMin > 0) {
+      setInterval(() => {
+        // Invalider le cache JS pour ce widget avant le rechargement
+        Object.keys(rssPageCache).forEach(k => { if (k.startsWith(`${widgetId}__`)) delete rssPageCache[k]; });
+        loadRss(widgetId);
+      }, refreshMin * 60000);
+    }
   });
 
   document.querySelectorAll('[data-widget-type="weather"]').forEach(el => {
@@ -396,30 +406,69 @@ async function saveNote(widgetId, content) {
   showToast('Note sauvegardée');
 }
 
+function toggleNotePreview(widgetId) {
+  const container = document.querySelector(`.notes-widget[data-widget-id="${widgetId}"]`);
+  if (!container) return;
+  const textarea = container.querySelector('textarea');
+  const preview  = container.querySelector('.note-preview');
+  const btn      = container.querySelector('.note-toggle-btn');
+  const isEditing = !textarea.classList.contains('hidden');
+  if (isEditing) {
+    const raw = textarea.value || '';
+    preview.innerHTML = (typeof marked !== 'undefined') ? marked.parse(raw) : escHtml(raw).replace(/\n/g, '<br>');
+    textarea.classList.add('hidden');
+    preview.classList.remove('hidden');
+    btn.textContent = '✏️ Éditer';
+  } else {
+    textarea.classList.remove('hidden');
+    preview.classList.add('hidden');
+    btn.textContent = '👁 Aperçu';
+  }
+}
+
 // ----------------------------------------------------------------
 // Todos
 // ----------------------------------------------------------------
+function todoDueColorClass(dateStr) {
+  const today = new Date(); today.setHours(0, 0, 0, 0);
+  const due   = new Date(dateStr + 'T00:00:00');
+  const diff  = Math.floor((due - today) / 86400000);
+  if (diff < 0)  return 'text-red-400';
+  if (diff === 0) return 'text-orange-300';
+  return 'text-white/30';
+}
+
 async function addTodo(e, widgetId) {
   e.preventDefault();
-  const input = e.target.querySelector('input');
-  const title = input.value.trim();
+  const input    = e.target.querySelector('input[type="text"]');
+  const dueInput = e.target.querySelector('input[name="due"]');
+  const title    = input.value.trim();
   if (!title) return;
 
-  const res = await apiFetch('/api/v1/todos', { widget_id: widgetId, title });
+  const due = dueInput?.value || null;
+  const res = await apiFetch('/api/v1/todos', { widget_id: widgetId, title, due_date: due });
   if (res.id) {
     const list = document.querySelector(`.todo-list[data-widget-id="${widgetId}"]`);
     if (list) {
-      const label = document.createElement('label');
-      label.className = 'flex items-center gap-2.5 py-1 px-1 rounded-lg hover:bg-white/5 cursor-pointer group';
+      const dueClass = due ? todoDueColorClass(due) : 'text-white/20';
+      const hasDue   = due ? 'has-date' : '';
+      const label    = document.createElement('label');
+      label.className = 'todo-row flex items-center gap-2 py-1 px-1 rounded-lg hover:bg-white/5 cursor-pointer group';
       label.innerHTML = `
         <input type="checkbox" class="accent-indigo-500 w-4 h-4 flex-shrink-0"
           onchange="toggleTodo(${res.id}, this)">
         <span class="text-sm flex-1 text-white/80">${escHtml(title)}</span>
+        <input type="date" value="${escHtml(due || '')}"
+          class="todo-due ${dueClass} ${hasDue}"
+          onchange="updateTodoDue(${res.id}, this.value, this)"
+          onclick="event.stopPropagation()"
+          title="Date d'échéance">
         <button onclick="deleteTodo(${res.id}, this.closest('label'))"
-          class="opacity-0 group-hover:opacity-100 text-white/30 hover:text-red-400 transition text-xs">✕</button>`;
+          class="opacity-0 group-hover:opacity-100 text-white/30 hover:text-red-400 transition text-xs flex-shrink-0">✕</button>`;
       list.appendChild(label);
     }
     input.value = '';
+    if (dueInput) dueInput.value = '';
   }
 }
 
@@ -438,6 +487,20 @@ async function toggleTodo(id, checkbox) {
 async function deleteTodo(id, label) {
   await apiFetch(`/api/v1/todos/${id}`, null, 'DELETE');
   label.remove();
+}
+
+async function updateTodoDue(id, value, inputEl) {
+  try {
+    await apiFetch(`/api/v1/todos/${id}`, { due_date: value || null }, 'PUT');
+    inputEl.classList.remove('has-date', 'text-red-400', 'text-orange-300', 'text-white/30', 'text-white/20');
+    if (value) {
+      inputEl.classList.add('has-date', todoDueColorClass(value));
+    } else {
+      inputEl.classList.add('text-white/20');
+    }
+  } catch {
+    showToast('Erreur mise à jour date', 'error');
+  }
 }
 
 async function deleteBookmark(id, el) {
@@ -954,6 +1017,9 @@ function handleSearch(e, form) {
       x:    'https://x.com/search?q=',
       maps: 'https://maps.google.com/?q=',
       img:  'https://www.google.com/search?tbm=isch&q=',
+      kagi: 'https://kagi.com/search?q=',
+      eco:  'https://www.ecosia.org/search?q=',
+      pp:   'https://www.perplexity.ai/search?q=',
     };
     const url = bangs[key];
     window.open((url || 'https://www.google.com/search?q=' + encodeURIComponent(val))
