@@ -73,13 +73,18 @@ $rDark    = (int)($r * 0.8); $gDark = (int)($g * 0.8); $bDark = (int)($b * 0.8);
     </button>
     <div x-show="open" x-transition class="absolute top-full left-0 mt-1 w-52 rounded-xl shadow-2xl overflow-hidden"
       style="background:rgba(15,23,42,0.97);border:1px solid rgba(255,255,255,0.12);">
+      <div id="pages-sortable">
       <?php foreach ($pages as $p): ?>
       <a href="<?= BASE_URL ?>/admin.php?page=<?= htmlspecialchars($p['slug']) ?>"
         class="flex items-center gap-2.5 px-3 py-2.5 text-sm hover:bg-white/10 transition
-               <?= $p['id'] === $page['id'] ? 'text-brand font-medium' : 'text-white/80' ?>">
+               <?= $p['id'] === $page['id'] ? 'text-brand font-medium' : 'text-white/80' ?>"
+        data-page-id="<?= $p['id'] ?>">
+        <span class="page-drag-handle cursor-grab text-white/20 hover:text-white/50 text-xs select-none flex-shrink-0"
+              onclick="event.preventDefault(); event.stopPropagation()">⠿</span>
         <?= htmlspecialchars($p['icon'] . ' ' . $p['name']) ?>
       </a>
       <?php endforeach; ?>
+      </div>
       <div class="border-t border-white/10 px-3 py-2">
         <button onclick="adminApp.showModal('new-page')"
           class="text-sm text-white/50 hover:text-white transition w-full text-left">+ Nouvelle page</button>
@@ -147,6 +152,11 @@ $rDark    = (int)($r * 0.8); $gDark = (int)($g * 0.8); $bDark = (int)($b * 0.8);
               data-widget-config="<?= htmlspecialchars($w['config_json'] ?? '{}', ENT_QUOTES) ?>"
               data-widget-title="<?= htmlspecialchars($w['title'] ?? '', ENT_QUOTES) ?>"
               class="p-1.5 rounded-lg hover:bg-white/20 text-white/50 hover:text-white transition text-xs">⚙️</button>
+            <button onclick="adminApp.duplicateWidget(<?= $w['id'] ?>, '<?= htmlspecialchars($w['type'], ENT_QUOTES) ?>', this)"
+              data-widget-config="<?= htmlspecialchars($w['config_json'] ?? '{}', ENT_QUOTES) ?>"
+              data-widget-title="<?= htmlspecialchars($w['title'] ?? '', ENT_QUOTES) ?>"
+              class="p-1.5 rounded-lg hover:bg-white/20 text-white/50 hover:text-white transition text-xs"
+              title="Dupliquer">⧉</button>
             <button onclick="adminApp.deleteWidget(<?= $w['id'] ?>)"
               class="p-1.5 rounded-lg hover:bg-red-500/30 text-white/30 hover:text-red-400 transition text-xs">✕</button>
           </div>

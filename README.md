@@ -17,7 +17,7 @@ Page de démarrage personnalisée auto-hébergée, servie par PHP + MySQL.
 | **Météo** | Conditions actuelles + prévisions 5 jours, recherche par ville ou code postal, géolocalisation |
 | **Flux RSS** | Multi-flux avec onglets, cache serveur configurable, **rafraîchissement automatique** (15/30/60/120 min) |
 | **Notes** | Zone de texte libre, sauvegarde automatique, **rendu Markdown** avec toggle édition/aperçu |
-| **Todo** | Liste de tâches avec cases à cocher, réorganisation, **dates d'échéance** avec indicateur visuel (rouge/orange/gris) |
+| **Todo** | Liste de tâches avec cases à cocher, **réorganisation par glisser-déposer**, **dates d'échéance** avec indicateur visuel (rouge/orange/gris) |
 | **Recherche** | Barre de recherche (Google, DuckDuckGo, Brave, Bing, **Kagi, Perplexity, Ecosia**), bangs (`!g`, `!yt`, `!kagi`, `!eco`, `!pp`…) |
 | **Horloge** | Heure en temps réel |
 | **Embed** | Intégration d'une URL en iframe, rafraîchissement automatique configurable |
@@ -36,7 +36,8 @@ Page de démarrage personnalisée auto-hébergée, servie par PHP + MySQL.
 - Couleur d'accent personnalisable par page
 - Fond d'écran par page : couleur, dégradé ou image uploadée
 - Galerie d'images avec déduplication MD5 et suppression
-- Réorganisation des widgets par glisser-déposer (grille)
+- Réorganisation des widgets par glisser-déposer (grille) et **duplication de widget**
+- **Réorganisation des pages** par glisser-déposer (barre d'admin)
 - Palette de commandes (`Ctrl+K`) et raccourcis clavier globaux
 - Interface d'administration dédiée (`/admin`)
 - Import / Export de la configuration (sauvegarde complète, inclut les dates d'échéance)
@@ -118,7 +119,7 @@ Toutes les requêtes passent par `/api/v1/{ressource}`.
 | `widgets` | `GET`, `POST`, `PUT /{id}`, `DELETE /{id}`, `POST /reorder` | Widgets |
 | `bookmarks` | `GET`, `POST`, `DELETE /{id}`, `POST /reorder` | Marque-pages |
 | `notes` | `POST` | Sauvegarde de note |
-| `todos` | `POST`, `PUT /{id}`, `DELETE /{id}` | Tâches (toggle done ou mise à jour `due_date`) |
+| `todos` | `POST`, `PUT /{id}`, `DELETE /{id}`, `POST /reorder` | Tâches (toggle done, mise à jour `due_date`, réorganisation) |
 | `weather` | `GET ?city=` ou `?lat=&lon=` | Données météo |
 | `rss` | `GET ?widget_id=&url=` | Lecture de flux RSS |
 | `upload` | `POST ?page_id=` | Upload fond d'écran / galerie |

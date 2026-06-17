@@ -98,6 +98,9 @@ function initGrid(editMode) {
 
   // Drag & drop bookmarks
   initBookmarksSortable();
+
+  // Drag & drop todos
+  initTodosSortable();
 }
 
 // ----------------------------------------------------------------
@@ -454,7 +457,9 @@ async function addTodo(e, widgetId) {
       const hasDue   = due ? 'has-date' : '';
       const label    = document.createElement('label');
       label.className = 'todo-row flex items-center gap-2 py-1 px-1 rounded-lg hover:bg-white/5 cursor-pointer group';
+      label.dataset.id = String(res.id);
       label.innerHTML = `
+        <span class="todo-handle text-white/20 cursor-grab text-xs flex-shrink-0 opacity-0 group-hover:opacity-100 select-none" onclick="event.stopPropagation()">⠿</span>
         <input type="checkbox" class="accent-indigo-500 w-4 h-4 flex-shrink-0"
           onchange="toggleTodo(${res.id}, this)">
         <span class="text-sm flex-1 text-white/80">${escHtml(title)}</span>
@@ -506,6 +511,26 @@ async function updateTodoDue(id, value, inputEl) {
 async function deleteBookmark(id, el) {
   await apiFetch(`/api/v1/bookmarks/${id}`, null, 'DELETE');
   el.remove();
+}
+
+// ----------------------------------------------------------------
+// Drag & drop todos (SortableJS)
+// ----------------------------------------------------------------
+function initTodosSortable() {
+  document.querySelectorAll('.todo-list').forEach(list => {
+    Sortable.create(list, {
+      animation:   150,
+      handle:      '.todo-handle',
+      fallbackOnBody: true,
+      ghostClass:  'opacity-20',
+      chosenClass: 'opacity-60',
+      onEnd: async () => {
+        const widgetId = parseInt(list.dataset.widgetId);
+        const order    = [...list.children].map(el => parseInt(el.dataset.id)).filter(Boolean);
+        await apiFetch('/api/v1/todos/reorder', { widget_id: widgetId, order });
+      },
+    });
+  });
 }
 
 // ----------------------------------------------------------------

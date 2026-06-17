@@ -377,7 +377,8 @@ function renderTodo(int $id): void {
             $dueClass = 'text-white/20';
         }
         $hasDue = $due ? 'has-date' : '';
-        echo '<label class="todo-row flex items-center gap-2 py-1 px-1 rounded-lg hover:bg-white/5 cursor-pointer group">
+        echo '<label class="todo-row flex items-center gap-2 py-1 px-1 rounded-lg hover:bg-white/5 cursor-pointer group" data-id="' . (int)$t['id'] . '">
+                <span class="todo-handle text-white/20 cursor-grab text-xs flex-shrink-0 opacity-0 group-hover:opacity-100 select-none" onclick="event.stopPropagation()">⠿</span>
                 <input type="checkbox" ' . $check . ' class="accent-indigo-500 w-4 h-4 flex-shrink-0"
                   onchange="toggleTodo(' . (int)$t['id'] . ', this)">
                 <span class="text-sm flex-1 text-white/80 ' . $done . '">' . htmlspecialchars($t['title']) . '</span>

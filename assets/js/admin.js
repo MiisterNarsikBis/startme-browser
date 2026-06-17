@@ -87,6 +87,11 @@ const adminApp = {
               data-widget-config="${escHtml(JSON.stringify(def.config))}"
               data-widget-title="${escHtml(def.title)}"
               class="p-1.5 rounded-lg hover:bg-white/20 text-white/50 hover:text-white transition text-xs">⚙️</button>
+            <button onclick="adminApp.duplicateWidget(${res.id}, '${escHtml(type)}', this)"
+              data-widget-config="${escHtml(JSON.stringify(def.config))}"
+              data-widget-title="${escHtml(def.title)}"
+              class="p-1.5 rounded-lg hover:bg-white/20 text-white/50 hover:text-white transition text-xs"
+              title="Dupliquer">⧉</button>
             <button onclick="adminApp.deleteWidget(${res.id})"
               class="p-1.5 rounded-lg hover:bg-red-500/30 text-white/30 hover:text-red-400 transition text-xs">✕</button>
           </div>
@@ -1146,6 +1151,31 @@ const adminApp = {
   // ----------------------------------------------------------
   // NOUVELLE PAGE
   // ----------------------------------------------------------
+  async duplicateWidget(id, type, btn) {
+    const config  = JSON.parse(btn.dataset.widgetConfig || '{}');
+    const title   = (btn.dataset.widgetTitle || type) + ' (copie)';
+    const el      = document.querySelector(`.grid-stack-item[gs-id="${id}"]`);
+    const node    = el ? grid.engine.nodes.find(n => n.el === el) : null;
+    const bottomY = grid.engine.nodes.reduce((max, n) => Math.max(max, n.y + n.h), 0);
+
+    try {
+      await apiFetch('/api/v1/widgets', {
+        page_id: PAGE_ID,
+        type,
+        title,
+        config,
+        grid_x: 0,
+        grid_y: bottomY,
+        grid_w: node ? node.w : 3,
+        grid_h: node ? node.h : 30,
+      });
+      showToast('Widget dupliqué');
+      setTimeout(() => window.location.reload(), 700);
+    } catch (e) {
+      showToast('Erreur : ' + e.message, 'error');
+    }
+  },
+
   async createPage() {
     const name = document.getElementById('new-page-name')?.value.trim();
     const icon = document.getElementById('new-page-icon')?.value.trim() || '📄';
@@ -1155,3 +1185,24 @@ const adminApp = {
     window.location.href = `${BASE_URL}/admin.php?page=${res.slug}`;
   },
 };
+
+// Réorganisation des pages (SortableJS)
+const _pagesSortable = document.getElementById('pages-sortable');
+if (_pagesSortable && typeof Sortable !== 'undefined') {
+  Sortable.create(_pagesSortable, {
+    animation:   150,
+    handle:      '.page-drag-handle',
+    ghostClass:  'opacity-20',
+    onEnd: async () => {
+      const order = [..._pagesSortable.children]
+        .map(el => parseInt(el.dataset.pageId))
+        .filter(Boolean);
+      try {
+        await apiFetch('/api/v1/pages/reorder', { order });
+        showToast('Ordre des pages sauvegardé');
+      } catch (e) {
+        showToast('Erreur : ' + e.message, 'error');
+      }
+    },
+  });
+}

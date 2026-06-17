@@ -1,7 +1,8 @@
 <?php
 /* POST   /api/v1/todos           { widget_id, title }
    PUT    /api/v1/todos/{id}      (toggle done)
-   DELETE /api/v1/todos/{id} */
+   DELETE /api/v1/todos/{id}
+   POST   /api/v1/todos/reorder   { widget_id, order: [id,...] } */
 
 function owns_widget_todos(int $uid, int $widget_id): bool {
     return db_fetch(
@@ -42,6 +43,17 @@ if ($method === 'DELETE' && $id !== null) {
     $todo = db_fetch('SELECT widget_id FROM todos WHERE id=?', [$id]);
     if (!$todo || !owns_widget_todos($uid, $todo['widget_id'])) json_error('Accès refusé.', 403);
     db_query('DELETE FROM todos WHERE id=?', [$id]);
+    json_response(['ok' => true]);
+}
+
+// POST — reorder
+if ($method === 'POST' && $sub === 'reorder') {
+    $d         = request_json();
+    $widget_id = (int)($d['widget_id'] ?? 0);
+    if (!owns_widget_todos($uid, $widget_id)) json_error('Accès refusé.', 403);
+    foreach (($d['order'] ?? []) as $pos => $todoId) {
+        db_query('UPDATE todos SET position=? WHERE id=? AND widget_id=?', [$pos + 1, (int)$todoId, $widget_id]);
+    }
     json_response(['ok' => true]);
 }
 
