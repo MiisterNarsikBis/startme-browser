@@ -19,33 +19,11 @@ if ($uid) {
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Connexion — Startme</title>
 <link rel="icon" type="image/svg+xml" href="<?= BASE_URL ?>/assets/favicon.svg">
-<script src="https://cdn.tailwindcss.com"></script>
-<script>
-tailwind.config = {
-  darkMode: 'class',
-  theme: {
-    extend: {
-      colors: {
-        brand: { DEFAULT: '#6366f1', dark: '#4f46e5' }
-      },
-      fontFamily: { mono: ['JetBrains Mono', 'Fira Code', 'monospace'] }
-    }
-  }
-}
-</script>
+<link rel="stylesheet" href="<?= BASE_URL ?>/assets/css/tailwind.css">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
-<style type="text/tailwindcss">
+<style>
   body { font-family: 'Inter', sans-serif; }
-  .word-chip {
-    @apply bg-white/10 border border-white/20 rounded-lg px-3 py-1.5 text-sm font-mono
-           cursor-pointer hover:bg-white/20 transition select-none;
-  }
-  .seed-input {
-    @apply bg-white/10 border border-white/20 rounded-lg px-3 py-2 text-sm font-mono
-           w-full focus:outline-none focus:border-brand focus:ring-1 focus:ring-brand
-           text-white placeholder-white/40;
-  }
   .glass {
     background: rgba(255,255,255,0.07);
     backdrop-filter: blur(20px);

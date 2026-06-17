@@ -36,24 +36,8 @@ $widgets = get_page_widgets($page['id']);
 <link rel="icon" type="image/svg+xml" href="<?= BASE_URL ?>/assets/favicon.svg">
 <link rel="manifest" href="<?= BASE_URL ?>/manifest.php">
 
-<!-- Tailwind -->
-<script src="https://cdn.tailwindcss.com"></script>
-<script>
-tailwind.config = {
-  darkMode: 'class',
-  theme: {
-    extend: {
-      colors: {
-        brand: {
-          DEFAULT: 'rgb(var(--brand) / <alpha-value>)',
-          dark:    'rgb(var(--brand-dark) / <alpha-value>)',
-        }
-      },
-      fontFamily: { mono: ['JetBrains Mono','monospace'] }
-    }
-  }
-}
-</script>
+<!-- Tailwind (généré via CLI, voir tailwind.config.js) -->
+<link rel="stylesheet" href="<?= BASE_URL ?>/assets/css/tailwind.css">
 <?php
 $accent  = $page['accent_color'] ?? '#6366f1';
 $accent  = preg_match('/^#[0-9a-fA-F]{6}$/', $accent) ? $accent : '#6366f1';
