@@ -35,7 +35,9 @@ function session_start_secure(): void {
 function get_current_user_id(): ?int {
     session_start_secure();
     if (!empty($_SESSION['user_id'])) {
-        return (int)$_SESSION['user_id'];
+        $uid = (int)$_SESSION['user_id'];
+        session_write_close(); // Libérer le verrou immédiatement pour les requêtes concurrentes
+        return $uid;
     }
     // Tentative de reconnexion via le cookie remember_me
     $token = $_COOKIE['remember_me'] ?? null;
