@@ -12,6 +12,7 @@ cache/
 .DS_Store
 Thumbs.db
 *.log
+*.stackdump
 
 # Tailwind CLI (binaire OS-spécifique, ~40 Mo)
 tailwindcss.exe
