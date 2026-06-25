@@ -2,7 +2,7 @@
    Stratégie : network-first pour les pages PHP et l'API,
    cache-first pour les assets statiques (JS, CSS, fonts, images). */
 
-const CACHE = 'startme-v1';
+const CACHE = 'startme-v2';
 const STATIC_ASSETS = [
   '/assets/favicon.svg',
 ];
@@ -27,8 +27,8 @@ self.addEventListener('fetch', e => {
   // Ignorer les schemes non-cachables (extensions Chrome, etc.)
   if (!url.protocol.startsWith('http')) return;
 
-  // Toujours réseau pour : PHP, API, auth
-  if (url.pathname.endsWith('.php') || url.pathname.includes('/api/')) {
+  // Toujours réseau pour : PHP, API, et toute navigation de page (contenu dynamique avec session)
+  if (url.pathname.endsWith('.php') || url.pathname.includes('/api/') || e.request.mode === 'navigate') {
     return;
   }
 

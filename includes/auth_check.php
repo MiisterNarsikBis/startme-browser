@@ -60,6 +60,7 @@ function get_current_user_id(): ?int {
             return $uid;
         }
     }
+    session_write_close();
     return null;
 }
 
